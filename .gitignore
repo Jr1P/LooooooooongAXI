@@ -1,0 +1,4 @@
+xilinx_ip/*
+ram_wrap/*
+axi_wrap/*
+CONFREG/*
