@@ -32,7 +32,7 @@ module ex_wb_seg (
     output reg          wb_load,
     output reg          wb_loadX,
     output reg [3 :0]   wb_lsV,
-    output reg [31:0]   wb_data_addr,
+    output reg [1 :0]   wb_data_addr,
     output reg          wb_al,
 
     output reg          wb_regwen,
@@ -53,7 +53,7 @@ module ex_wb_seg (
             wb_load     <= 1'b0;
             wb_loadX    <= 1'b0;
             wb_lsV      <= 4'b0;
-            wb_data_addr<= 32'b0;
+            wb_data_addr<= 2'b0;
             wb_al       <= 1'b0;
             wb_regwen   <= 1'b0;
             wb_wreg     <= 5'b0;

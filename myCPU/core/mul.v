@@ -1,6 +1,7 @@
 `timescale 1ns/1ps
 
 // * normal mul
+// TODO: 太拉了，改华莱士树
 module mul(
     input [31:0]    A,
     input [31:0]    B,

@@ -63,7 +63,7 @@ module id(
     output  BreakEx,        // Break point Ex
     output  SyscallEx       // System call Ex
 );
-    // TODO: TLB instructions
+    // TODO: TLB instructions and cache instructions
 
     wire [31:0] delay_slot_pc   = id_pc + 32'd4;
     wire [31:0] BranchTarget    = delay_slot_pc + {{14{id_inst[15]}}, {id_inst[15:0], 2'b00}};  // branch target
@@ -156,7 +156,7 @@ module id(
     wire op_lui     = op_d[15];
     wire op_mfc0    = op_d[16] && rs_d[0] && sa_d[0] && id_inst[5:3] == 3'b0;
     wire op_mtc0    = op_d[16] && rs_d[4] && sa_d[0] && id_inst[5:3] == 3'b0;
-    wire op_tlbr    = op_d[16] && rs_d[16] && rt_d[0] && rd_d[0] && sa_d[0] && func_d[1];
+    wire op_tlbr    = op_d[16] && rs_d[16] && rt_d[0] && rd_d[0] && sa_d[0] && func_d[1]; //TODO: tlb
     wire op_tlbwi   = op_d[16] && rs_d[16] && rt_d[0] && rd_d[0] && sa_d[0] && func_d[2];
     wire op_tlbp    = op_d[16] && rs_d[16] && rt_d[0] && rd_d[0] && sa_d[0] && func_d[8];
     wire op_eret    = op_d[16] && rs_d[16] && rt_d[0] && rd_d[0] && sa_d[0] && func_d[24];
@@ -168,6 +168,7 @@ module id(
     wire op_sb      = op_d[40];
     wire op_sh      = op_d[41];
     wire op_sw      = op_d[43];
+    wire op_cache   = op_d[47];
 
     assign ReservedIns  = ~|{`DECODED_OPS};
 

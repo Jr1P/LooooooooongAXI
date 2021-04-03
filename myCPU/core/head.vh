@@ -99,6 +99,8 @@
 `define CP0_Status      8'b01100_000    //* (12, 0)
 `define CP0_Cause       8'b01101_000    //* (13, 0)
 `define CP0_EPC         8'b01110_000    //* (14, 0)
+`define CP0_Config0     8'b10000_000    //* (16, 0)
+`define CP0_Config1     8'b10000_001    //* (16, 1)
 
 `define NUM_EX      6
 `define NUM_EX_1    5
@@ -107,7 +109,7 @@
 // * Index (4, 0)
 `define Index_LenIndex 8
 `define Index_IndexBITs `Index_LenIndex-1:0
-`define TLB_SIZE 64
+`define TLB_SIZE 6'd63
 
 // * Status (12, 0)
 `define Status_Bev  22
@@ -117,6 +119,9 @@
 
 // * Cause (13, 0)
 `define Cause_IP_SOFTWARE   9:8
+
+// * Config (16, 0)
+`define Config0_k0  2:0
 
 // *------------------
 `define GET_OP(x)   x[31:26]

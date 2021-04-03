@@ -26,7 +26,8 @@ module cp0 (
     output [31:0]       cause,
     output [31:0]       status,
     output [31:0]       index,
-    output reg [31:0]   epc
+    output reg [2 :0]   config0_k0, // * read and write | reset val : 0x2
+    output reg [31:0]   epc         // * read and write | reset val : null
 );
 
     // * address wrong (if seg, ex seg)
@@ -59,7 +60,7 @@ module cp0 (
         else if(inter_tik)  count <= count + 32'd1;
     end
 
-    // *Compare (13, 0) | read/write | reset val: null
+    // *Compare (11, 0) | read/write | reset val: null
     reg [31:0] compare;
     wire compare_wen = wen && addr == `CP0_Compare;
     always @(posedge clk) begin
@@ -128,6 +129,37 @@ module cp0 (
     // *                            存在未被屏蔽的中断                 没有例外在处理   中断使能开启
     assign ext_int_response = ({hardware_int, ip_software} & Status_IM) && !Status_EXL && Status_IE;
 
+    // * Config0 (16, 0) | read and partially writeable |
+    wire config0_wen = wen && addr == `CP0_Config0;
+    // *                    M            BE    AT    AR    MT
+    wire [31:0] config0 = {1'b1, 15'b0, 1'b0, 2'b0, 3'b0, 3'b1, 4'b0, config0_k0};
+
+    always @(posedge clk) begin
+        // * config_k0
+        if(!resetn) config0_k0 <= 3'b011;
+        else if(config0_wen) config0_k0 <= wdata[`Config0_k0];
+    end
+
+    // * Config1 (16, 1) | read only
+    // TODO: 配置修改
+    wire [31:0] config1 = {
+        1'b0,
+        `TLB_SIZE,  // *TLB entries
+        3'd1,       // *Icache组数
+        3'd1,       // *Icache行大小
+        3'd3,       // *Icache相联度
+        3'd1,       // *Dcache组数
+        3'd1,       // *Dcache行大小
+        3'd3,       // *Dcache相联度
+        1'b0,       // *C2
+        1'b0,       // *MD
+        1'b0,       // *PC
+        1'b0,       // *WR
+        1'b0,       // *CA
+        1'b0,       // *EP
+        1'b0        // *FP
+    };
+
     assign rdata = 
             {32{addr == `CP0_Index      }} & index      |
             {32{addr == `CP0_BadVAddr   }} & badvaddr   |
@@ -135,6 +167,7 @@ module cp0 (
             {32{addr == `CP0_Compare    }} & compare    |
             {32{addr == `CP0_Status     }} & status     |
             {32{addr == `CP0_Cause      }} & cause      |
+            {32{addr == `CP0_Config0    }} & config0    |
             {32{addr == `CP0_EPC        }} & epc        ;
 
 endmodule

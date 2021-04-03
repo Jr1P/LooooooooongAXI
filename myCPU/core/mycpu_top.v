@@ -39,46 +39,21 @@ module mycpu_top(
 
     input   [3 :0]  wid,
     input   [31:0]  wdata,
-    input   [1 :0]  wresp,
+    input   [3 :0]  wstrb,
     input           wlast,
     input           wvalid,
     output          wready,
+
+    input   [3 :0]  bid,
+    input   [1 :0]  bresp,
+    input           bvalid,
+    input           bready,
 
     output  [31:0]  debug_wb_pc,
     output  [3 :0]  debug_wb_rf_wen,
     output  [4 :0]  debug_wb_rf_wnum,
     output  [31:0]  debug_wb_rf_wdata
 );
-    // *data sram interface
-    // output          inst_sram_en,
-    // output  [3 :0]  inst_sram_wen,
-    // output  [31:0]  inst_sram_addr,
-    // output  [31:0]  inst_sram_wdata,
-    // input   [31:0]  inst_sram_rdata,
-    
-    // output          data_sram_en,
-    // output  [3 :0]  data_sram_wen,
-    // output  [31:0]  data_sram_addr,
-    // output  [31:0]  data_sram_wdata,
-    // input   [31:0]  data_sram_rdata,
-    
-    //   > Description : SoC, included cpu, 2 x 3 bridge,
-    //                   inst ram, confreg, data ram
-    // 
-    //           -------------------------
-    //           |           cpu         |
-    //           -------------------------
-    //                       | axi
-    //                       | 
-    //             ---------------------
-    //             |    1 x 2 bridge   |
-    //             ---------------------
-    //                  |            |           
-    //                  |            |           
-    //             -----------   -----------
-    //             | axi ram |   | confreg |
-    //             -----------   -----------
-    //
 
     // *Exceptions
     // TODO: TLB exceptions refill, invalid, modified
@@ -189,8 +164,113 @@ module mycpu_top(
     wire    id_ex_refresh;
     wire    ex_wb_refresh;
 
+    wire    div_stall;
+
+    //inst sram-like 
+    wire        inst_req;
+    wire [31:0] inst_addr   ;
+    wire [31:0] inst_wdata  ;
+    wire [31:0] inst_rdata  ;
+    wire        inst_addr_ok;
+    wire        inst_data_ok;
+    
+    //data sram-like 
+    wire        data_req    ;
+    wire        data_wr     ;
+    wire [1 :0] data_size   ;
+    wire [31:0] data_addr   ;
+    wire [31:0] data_wdata  ;
+    wire [31:0] data_rdata  ;
+    wire        data_addr_ok;
+    wire        data_data_ok;
+
+    reg reg_aresetn;
+    always @(posedge aclk)
+        reg_aresetn <= aresetn;
+    assign inst_req = !reg_aresetn || (inst_addr_ok && !inst_data_ok) || inst_data_ok;
+
+    cpu_axi_interface u_cpu_axi_interface(
+        .clk        (aclk),
+        .resetn     (aresetn),
+
+        // *sram-like
+        .inst_req   (inst_req),
+        .inst_wr    (1'b0),     // * not write
+        .inst_size  (2'b11),    // * 4 bytes
+        .inst_addr  (inst_addr),
+        .inst_wdata (32'b0),
+        .inst_rdata (inst_rdata),
+        .inst_addr_ok   (inst_addr_ok),
+        .inst_data_ok   (inst_data_ok),
+
+        .data_req   (data_req),
+        .data_wr    (data_wr),
+        .data_size  (data_size),
+        .data_addr  (data_addr),
+        .data_wdata (data_wdata),
+        .data_rdata (data_rdata),
+        .data_addr_ok   (data_addr_ok),
+        .data_data_ok   (data_data_ok),
+
+        // * axi
+        // * ar
+        .arid   (arid),
+        .araddr (araddr),
+        .arlen  (arlen),
+        .arsize (arsize),
+        .arburst(arburst),
+        .arlock (arlock),
+        .arcache(arcache),
+        .arprot (arprot),
+        .arvalid(arvalid),
+        .arready(arready),
+
+        // * r
+        .rid    (rid),
+        .rdata  (rdata),
+        .rresp  (rresp),
+        .rlast  (rlast),
+        .rvalid (rvalid),
+        .rready (rready),
+
+        // * aw
+        .awid   (awid),
+        .awaddr (awaddr),
+        .awlen  (awlen),
+        .awsize (awsize),
+        .awburst(awburst),
+        .awlock (awlock),
+        .awcache(awcache),
+        .awprot (awprot),
+        .awvalid(awvalid),
+        .awready(awready),
+
+        // * w
+        .wid    (wid),
+        .wdata  (wdata),
+        .wstrb  (wstrb),
+        .wlast  (wlast),
+        .wvalid (wvalid),
+        .wready (wready),
+        
+        // * b
+        .bid    (bid),
+        .bresp  (bresp),
+        .bvalid (bvalid),
+        .bready (bready)
+    );
+
+    reg reg_inst_data_ok;
+    always @(posedge aclk)
+        reg_inst_data_ok <= inst_data_ok;
+
     cu u_cu(
         .id_pc      (id_pc),
+
+        .inst_req       (inst_req),
+        .inst_data_ok   (reg_inst_data_ok),
+        .data_req       (data_req),
+        .data_data_ok   (data_data_ok),
 
         .ex_rs_ren  (ex_rs_ren),
         .ex_rs      (ex_rs),
@@ -212,6 +292,7 @@ module mycpu_top(
         .ex_wreg    (ex_wreg),
 
         .ex_stall   (cu_stall),
+        .div_stall  (div_stall),
 
         .if_id_stall    (if_id_stall),
         .id_ex_stall    (id_ex_stall),
@@ -235,15 +316,11 @@ module mycpu_top(
                                     {32{!wb_load && !wb_cp0ren && !(|wb_hiloren) && !wb_al}} & wb_res;
 
     // *IF
-    assign inst_sram_en     = 1'b1;     // always enable
-    assign inst_sram_wen    = 4'b0;     // not write
-    assign inst_sram_wdata  = 32'b0;    // not write
-
     wire [31:0] npc;
 
     pc u_pc(
-        .clk            (clk),
-        .resetn         (resetn),
+        .clk            (aclk),
+        .resetn         (aresetn),
         .stall          (if_id_stall),
         .BranchTarget   (id_target),
         .BranchTake     (id_branch && id_jump),
@@ -254,24 +331,25 @@ module mycpu_top(
         .npc            (npc)
     );
 
-    assign inst_sram_addr = !cu_stall ? npc : npc-32'd4;
-    assign if_inst_ADDRESS_ERROR = inst_sram_addr[1:0] != 2'b00;
+    assign inst_addr = !cu_stall ? npc : npc-32'd4;
+    // assign inst_addr = npc-32'd4;
+    assign if_inst_ADDRESS_ERROR = inst_addr[1:0] != 2'b00;
 
     reg exc_oc_invalid; // * 异常发生后紧接着取出的指令不是正确指令
-    always @(posedge clk) exc_oc_invalid <= !resetn ? 1'b0 : ex_exc_oc;
+    always @(posedge aclk) exc_oc_invalid <= !aresetn ? 1'b0 : ex_exc_oc;
 
     wire id_bd_tmp;
 
     if_id_seg u_if_id_seg(
-        .clk    (clk),
-        .resetn (resetn),
+        .clk    (aclk),
+        .resetn (aresetn),
 
         .stall  (if_id_stall),
         .refresh(if_id_refresh),
 
         .id_branch      (id_branch),
         .if_addr_error  (if_inst_ADDRESS_ERROR),
-        .if_pc          (inst_sram_addr),
+        .if_pc          (inst_addr),
 
         .id_bd          (id_bd),
         .id_addr_error  (id_addr_error),
@@ -285,11 +363,11 @@ module mycpu_top(
                             id_immXtype == 2'b01 ? {{16{id_inst[15]}}, `GET_Imm(id_inst)} : // signed extend
                             {`GET_Imm(id_inst), 16'b0};                                     // {imm, {16{0}}}
     
-    assign id_inst  = exc_oc_invalid ? 32'b0 : inst_sram_rdata;
+    assign id_inst  = exc_oc_invalid ? 32'b0 : inst_rdata;
 
     regfile u_regfile(
-        .clk    (clk),
-        .resetn (resetn),
+        .clk    (aclk),
+        .resetn (aresetn),
         .rs     (id_rs),
         .rt     (id_rt),
         .wen    (wb_regwen),
@@ -351,8 +429,8 @@ module mycpu_top(
     wire [`NUM_EX_1-1:0] id_ex = {id_ReservedIns, 1'b0, id_BreakEx, id_SyscallEx, 1'b0};
 
     id_ex_seg u_id_ex_seg(
-        .clk    (clk),
-        .resetn (resetn),
+        .clk    (aclk),
+        .resetn (aresetn),
 
         .stall  (id_ex_stall),
         .refresh(id_ex_refresh),
@@ -360,7 +438,7 @@ module mycpu_top(
         .id_addr_error(id_addr_error),
         .id_ex      (id_ex),
         .id_pc      (id_pc),
-        .id_inst    (inst_sram_rdata), // * avoid timing loop
+        .id_inst    (inst_rdata), // * avoid timing loop
         .id_imm     (id_imm),
         .id_Imm     (id_Imm),
         .id_A       (regouta),
@@ -446,13 +524,26 @@ module mycpu_top(
         .res        (mul_res),
         .signedres  (mul_signed_res)
     );
-    wire [63:0] div_res, div_signed_res;
-    div u_div(
-        .A  (inAlu1),
-        .B  (inAlu2),
 
-        .res        (div_res),
-        .signedres  (div_signed_res)
+    wire [31:0] quot, remainder;
+    wire div_working, div_finish;
+    wire div_cancel = div_working && ex_div;
+    assign div_stall = ((|ex_hiloren) || (|ex_hilowen)) && div_working;
+    div u_div(
+        .clk    (aclk),
+        .resetn (aresetn),
+
+        .en     (ex_div),
+        .sign   (ex_mdsign),
+        .A      (inAlu1),
+        .B      (inAlu2),
+        .cancel (div_cancel),
+
+        .Q      (quot),
+        .R      (remainder),
+
+        .working(div_working),
+        .finish (div_finish)
     );
 
     // * write HI LO
@@ -460,23 +551,18 @@ module mycpu_top(
                             ex_mult ?
                                 {32{!ex_mdsign} } & mul_res[63:32] |
                                 {32{ex_mdsign}  } & mul_signed_res[63:32] :
-                            ex_div  ? 
-                                {32{!ex_mdsign} } & div_res[63:32] |
-                                {32{ex_mdsign}  } & div_signed_res[63:32] :
-                            32'b0;
+                            remainder;
     wire [31:0] lowdata =   ex_hilowen == 2'b01 ? inAlu1 : // *GPR[rs] -> LO
                             ex_mult ?
                                 {32{!ex_mdsign} } & mul_res[31:0] |
                                 {32{ex_mdsign}  } & mul_signed_res[31:0] :
-                            ex_div  ? 
-                                {32{!ex_mdsign} } & div_res[31:0] |
-                                {32{ex_mdsign}  } & div_signed_res[31:0] :
-                            32'b0;
-
+                            quot;
+    wire [1:0] hilowen = ex_div || div_working ? 2'b0 : div_finish ? 2'b11 : ex_hilowen;
     hilo u_hilo(
-        .clk    (clk),
-        .resetn (resetn),
-        .wen    (ex_hilowen),
+        .clk    (aclk),
+        .resetn (aresetn),
+        
+        .wen    (hilowen),
         .hiwdata(hiwdata),
         .lowdata(lowdata),
         .ren    (ex_hiloren),
@@ -488,12 +574,12 @@ module mycpu_top(
     assign ex_wdata = wb_wreg == ex_rt && wb_regwen ? wb_reorder_data : ex_B;
 
     // *data_sram and cp0
-    assign data_sram_en = ex_data_en && !ex_data_ADDRESS_ERROR;
-    assign data_sram_addr = ex_res & 32'h1fff_ffff;
- 
-    assign data_sram_wen = ex_data_wen << data_sram_addr[1:0];
-    assign ex_data_ADDRESS_ERROR = ex_data_en && (ex_load && (ex_data_ren == 4'b0011 && data_sram_addr[0] || ex_data_ren == 4'b1111 && data_sram_addr[1:0] != 2'b00)
-                                    || !ex_load && (ex_data_wen == 4'b0011 && data_sram_addr[0] || ex_data_wen == 4'b1111 && data_sram_addr[1:0] != 2'b00));
+    assign data_req = ex_data_en && !ex_data_ADDRESS_ERROR;
+    assign data_addr = ex_res & 32'h1fff_ffff;
+    assign data_wr = |ex_data_wen;
+    assign data_size = ex_data_wen;
+    assign ex_data_ADDRESS_ERROR = ex_data_en && (ex_load && (ex_data_ren == 4'b0011 && data_addr[0] || ex_data_ren == 4'b1111 && data_addr[1:0] != 2'b00)
+                                    || !ex_load && (ex_data_wen == 4'b0011 && data_addr[0] || ex_data_wen == 4'b1111 && data_addr[1:0] != 2'b00));
  
 
     wire [`EXBITS] EX_ex = {ex_addr_error, ex_ex} | {2'b0, ex_IntegerOverflow, 2'b0, ex_data_ADDRESS_ERROR};
@@ -517,14 +603,14 @@ module mycpu_top(
     assign data_sram_wdata = {  {8{ex_lsV[3]}} & cp0_wdata[31:24],
                                 {8{ex_lsV[2]}} & cp0_wdata[23:16],
                                 {8{ex_lsV[1]}} & cp0_wdata[15: 8],
-                                {8{ex_lsV[0]}} & cp0_wdata[7 : 0]} << {data_sram_addr[1:0], 3'b000};
+                                {8{ex_lsV[0]}} & cp0_wdata[7 : 0]} << {data_addr[1:0], 3'b000};
 
     assign ex_exc_oc = !cp0_status[`Status_EXL] && exc_valid;
     wire [31:0] exc_badvaddr = EX_ex[5] ? ex_pc : ex_res;
     // * CP0 regs
     cp0 u_cp0(
-        .clk    (clk),
-        .resetn (resetn),
+        .clk    (aclk),
+        .resetn (aresetn),
 
         .ext_int            (ext_int),
         .ext_int_response   (ext_int_response),
@@ -547,10 +633,10 @@ module mycpu_top(
     );
 
     ex_wb_seg u_ex_wb_seg(
-        .clk    (clk),
-        .resetn (resetn),
+        .clk    (aclk),
+        .resetn (aresetn),
 
-        .stall  (ex_wb_stall),
+        .stall  (ex_wb_stall || (data_req && !data_data_ok)),
         .refresh(ex_wb_refresh),
 
         .ex_pc          (ex_pc),
@@ -559,7 +645,7 @@ module mycpu_top(
         .ex_load        (ex_load),
         .ex_loadX       (ex_loadX),
         .ex_lsV         (ex_lsV),
-        .ex_data_addr   (data_sram_addr[1:0]),
+        .ex_data_addr   (data_addr[1:0]),
         .ex_al          (ex_al),
         .ex_regwen      (ex_regwen),
         .ex_wreg        (ex_wreg),
@@ -586,14 +672,14 @@ module mycpu_top(
         .wb_hilordata   (wb_hilordata)
     );
 
-    wire [31:0] data_rdata = data_sram_rdata >> {wb_data_addr, 3'b0};
+    wire [31:0] wb_data_rdata = data_rdata >> {wb_data_addr, 3'b0};
 
-    assign wb_rdata[7 : 0] =    {8{wb_lsV[0]}} & data_rdata[7:0];
-    assign wb_rdata[15: 8] =    {8{wb_lsV[1]}} & data_rdata[15:8] |
-                                {8{!wb_lsV[1] && wb_lsV[0] && wb_loadX && data_rdata[7]}};
-    assign wb_rdata[31:16] =    {16{wb_lsV[2] && wb_lsV[3]}} & data_rdata[31:16]   |
-                                {16{!wb_lsV[2] && !wb_lsV[3] && wb_lsV[1] && wb_loadX && data_rdata[15]}} |
-                                {16{!wb_lsV[2] && !wb_lsV[3] && !wb_lsV[1] && wb_lsV[0] && wb_loadX && data_rdata[7]}};
+    assign wb_rdata[7 : 0] =    {8{wb_lsV[0]}} & wb_data_rdata[7:0];
+    assign wb_rdata[15: 8] =    {8{wb_lsV[1]}} & wb_data_rdata[15:8] |
+                                {8{!wb_lsV[1] && wb_lsV[0] && wb_loadX && wb_data_rdata[7]}};
+    assign wb_rdata[31:16] =    {16{wb_lsV[2] && wb_lsV[3]}} & wb_data_rdata[31:16]   |
+                                {16{!wb_lsV[2] && !wb_lsV[3] && wb_lsV[1] && wb_loadX && wb_data_rdata[15]}} |
+                                {16{!wb_lsV[2] && !wb_lsV[3] && !wb_lsV[1] && wb_lsV[0] && wb_loadX && wb_data_rdata[7]}};
 
     // *WB
     assign inRegData =  {32{wb_al}      } & (wb_pc + 32'd8) |   // *al: pc+8 -> GPR[31]

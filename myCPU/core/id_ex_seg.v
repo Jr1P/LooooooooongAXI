@@ -1,4 +1,5 @@
 `timescale 1ns/1ps
+`include "head.vh"
 
 module id_ex_seg (
     input   clk,
