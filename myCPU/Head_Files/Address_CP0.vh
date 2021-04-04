@@ -1,0 +1,164 @@
+/*
+    @Copyright HIT team
+    The definition of the address of registers in CP0
+*/
+`ifndef _CP0_ADDR_VH_
+
+/* Address of Coprocessor 0 Registers: Begin */
+`define CP0ADDR_REG_LEN         5//FIXME:is there 5?
+`define CP0ADDR_SEL_LEN         3
+`define CP0ADDR_LEN             ( `CP0ADDR_REG_LEN + `CP0ADDR_SEL_LEN )
+`define CP0ADDR_BUS             `N(`CP0ADDR_LEN)
+
+/****************************************
+ *                                      *
+ *  {x, y}: CP0 Register x, Select y.   *
+ *                                      *
+ ****************************************/
+
+`define CP0ADDR_INDEX           {`CP0ADDR_REG_LEN'd00, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_MVPCONTROL      {`CP0ADDR_REG_LEN'd00, `CP0ADDR_SEL_LEN'b001}
+// `define CP0ADDR_MVPCONF0        {`CP0ADDR_REG_LEN'd00, `CP0ADDR_SEL_LEN'b010}
+// `define CP0ADDR_MVPCONF1        {`CP0ADDR_REG_LEN'd00, `CP0ADDR_SEL_LEN'b011}
+
+`define CP0ADDR_RANDOM          {`CP0ADDR_REG_LEN'd01, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_VPECONTROL      {`CP0ADDR_REG_LEN'd01, `CP0ADDR_SEL_LEN'b001}
+// `define CP0ADDR_VPECONF0        {`CP0ADDR_REG_LEN'd01, `CP0ADDR_SEL_LEN'b010}
+// `define CP0ADDR_VPECONF1        {`CP0ADDR_REG_LEN'd01, `CP0ADDR_SEL_LEN'b011}
+// `define CP0ADDR_YQMASK          {`CP0ADDR_REG_LEN'd01, `CP0ADDR_SEL_LEN'b100}
+// `define CP0ADDR_VPESCHEDULE     {`CP0ADDR_REG_LEN'd01, `CP0ADDR_SEL_LEN'b101}
+// `define CP0ADDR_VPESCHEFBACK    {`CP0ADDR_REG_LEN'd01, `CP0ADDR_SEL_LEN'b110}
+// `define CP0ADDR_VPEOPT          {`CP0ADDR_REG_LEN'd01, `CP0ADDR_SEL_LEN'b111}
+
+`define CP0ADDR_ENTRYLO0        {`CP0ADDR_REG_LEN'd02, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_TCSTATUS        {`CP0ADDR_REG_LEN'd02, `CP0ADDR_SEL_LEN'b001}
+// `define CP0ADDR_TCBIND          {`CP0ADDR_REG_LEN'd02, `CP0ADDR_SEL_LEN'b010}
+// `define CP0ADDR_TCRESTART       {`CP0ADDR_REG_LEN'd02, `CP0ADDR_SEL_LEN'b011}
+// `define CP0ADDR_TCHALT          {`CP0ADDR_REG_LEN'd02, `CP0ADDR_SEL_LEN'b100}
+// `define CP0ADDR_TCCONTEXT       {`CP0ADDR_REG_LEN'd02, `CP0ADDR_SEL_LEN'b101}
+// `define CP0ADDR_TCSCHEDULE      {`CP0ADDR_REG_LEN'd02, `CP0ADDR_SEL_LEN'b110}
+// `define CP0ADDR_TCSCHEFBACK     {`CP0ADDR_REG_LEN'd02, `CP0ADDR_SEL_LEN'b111}
+
+`define CP0ADDR_ENTRYLO1        {`CP0ADDR_REG_LEN'd03, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_TCOPT           {`CP0ADDR_REG_LEN'd03, `CP0ADDR_SEL_LEN'b111}
+
+`define CP0ADDR_CONTEXT         {`CP0ADDR_REG_LEN'd04, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_CONTEXTCONFIG   {`CP0ADDR_REG_LEN'd04, `CP0ADDR_SEL_LEN'b001}
+// `define CP0ADDR_USERLOCAL       {`CP0ADDR_REG_LEN'd04, `CP0ADDR_SEL_LEN'b010}
+// `define CP0ADDR_04_3            {`CP0ADDR_REG_LEN'd04, `CP0ADDR_SEL_LEN'b011} // Reserved
+
+`define CP0ADDR_PAGEMASK        {`CP0ADDR_REG_LEN'd05, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_PAGEGRAIN       {`CP0ADDR_REG_LEN'd05, `CP0ADDR_SEL_LEN'b001}
+
+`define CP0ADDR_WIRED           {`CP0ADDR_REG_LEN'd06, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_SRSCONF0        {`CP0ADDR_REG_LEN'd06, `CP0ADDR_SEL_LEN'b001}
+// `define CP0ADDR_SRSCONF1        {`CP0ADDR_REG_LEN'd06, `CP0ADDR_SEL_LEN'b010}
+// `define CP0ADDR_SRSCONF2        {`CP0ADDR_REG_LEN'd06, `CP0ADDR_SEL_LEN'b011}
+// `define CP0ADDR_SRSCONF3        {`CP0ADDR_REG_LEN'd06, `CP0ADDR_SEL_LEN'b100}
+// `define CP0ADDR_SRSCONF4        {`CP0ADDR_REG_LEN'd06, `CP0ADDR_SEL_LEN'b101}
+
+// `define CP0ADDR_HWRENA          {`CP0ADDR_REG_LEN'd07, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_07_1            {`CP0ADDR_REG_LEN'd07, `CP0ADDR_SEL_LEN'b001} // Reserved
+// `define CP0ADDR_07_2            {`CP0ADDR_REG_LEN'd07, `CP0ADDR_SEL_LEN'b010} // Reserved
+// `define CP0ADDR_07_3            {`CP0ADDR_REG_LEN'd07, `CP0ADDR_SEL_LEN'b011} // Reserved
+// `define CP0ADDR_07_4            {`CP0ADDR_REG_LEN'd07, `CP0ADDR_SEL_LEN'b100} // Reserved
+// `define CP0ADDR_07_5            {`CP0ADDR_REG_LEN'd07, `CP0ADDR_SEL_LEN'b101} // Reserved
+// `define CP0ADDR_07_6            {`CP0ADDR_REG_LEN'd07, `CP0ADDR_SEL_LEN'b110} // Reserved
+// `define CP0ADDR_07_7            {`CP0ADDR_REG_LEN'd07, `CP0ADDR_SEL_LEN'b111} // Reserved
+
+`define CP0ADDR_BADVADDR        {`CP0ADDR_REG_LEN'd08, `CP0ADDR_SEL_LEN'b000}
+
+`define CP0ADDR_COUNT           {`CP0ADDR_REG_LEN'd09, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_09_6            {`CP0ADDR_REG_LEN'd09, `CP0ADDR_SEL_LEN'b110} // Reserved
+// `define CP0ADDR_09_7            {`CP0ADDR_REG_LEN'd09, `CP0ADDR_SEL_LEN'b111} // Reserved
+
+`define CP0ADDR_ENTRYHI         {`CP0ADDR_REG_LEN'd10, `CP0ADDR_SEL_LEN'b000}
+
+`define CP0ADDR_COMPARE         {`CP0ADDR_REG_LEN'd11, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_11_6            {`CP0ADDR_REG_LEN'd11, `CP0ADDR_SEL_LEN'b110} // Reserved
+// `define CP0ADDR_11_7            {`CP0ADDR_REG_LEN'd11, `CP0ADDR_SEL_LEN'b111} // Reserved
+
+`define CP0ADDR_STATUS          {`CP0ADDR_REG_LEN'd12, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_INTCTL          {`CP0ADDR_REG_LEN'd12, `CP0ADDR_SEL_LEN'b001}
+// `define CP0ADDR_SRSCTL          {`CP0ADDR_REG_LEN'd12, `CP0ADDR_SEL_LEN'b010}
+// `define CP0ADDR_SRSMAP          {`CP0ADDR_REG_LEN'd12, `CP0ADDR_SEL_LEN'b011}
+// `define CP0ADDR_VIEW_IPL        {`CP0ADDR_REG_LEN'd12, `CP0ADDR_SEL_LEN'b100}
+// `define CP0ADDR_SRSMAP2         {`CP0ADDR_REG_LEN'd12, `CP0ADDR_SEL_LEN'b101}
+
+`define CP0ADDR_CAUSE           {`CP0ADDR_REG_LEN'd13, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_VIEW_RIPL       {`CP0ADDR_REG_LEN'd13, `CP0ADDR_SEL_LEN'b100}
+
+`define CP0ADDR_EPC             {`CP0ADDR_REG_LEN'd14, `CP0ADDR_SEL_LEN'b000}
+
+`define CP0ADDR_PRID            {`CP0ADDR_REG_LEN'd15, `CP0ADDR_SEL_LEN'b000}
+`define CP0ADDR_EBASE           {`CP0ADDR_REG_LEN'd15, `CP0ADDR_SEL_LEN'b001}
+// `define CP0ADDR_CDMMBASE        {`CP0ADDR_REG_LEN'd15, `CP0ADDR_SEL_LEN'b010}
+// `define CP0ADDR_CMGCRBASE       {`CP0ADDR_REG_LEN'd15, `CP0ADDR_SEL_LEN'b011}
+
+`define CP0ADDR_CONFIG0         {`CP0ADDR_REG_LEN'd16, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_CONFIG1         {`CP0ADDR_REG_LEN'd16, `CP0ADDR_SEL_LEN'b001}
+// `define CP0ADDR_CONFIG2         {`CP0ADDR_REG_LEN'd16, `CP0ADDR_SEL_LEN'b010}
+// `define CP0ADDR_CONFIG3         {`CP0ADDR_REG_LEN'd16, `CP0ADDR_SEL_LEN'b011}
+// `define CP0ADDR_CONFIG4         {`CP0ADDR_REG_LEN'd16, `CP0ADDR_SEL_LEN'b100}
+// `define CP0ADDR_16_6            {`CP0ADDR_REG_LEN'd16, `CP0ADDR_SEL_LEN'b110} // Reserved
+// `define CP0ADDR_16_7            {`CP0ADDR_REG_LEN'd16, `CP0ADDR_SEL_LEN'b111} // Reserved
+
+// `define CP0ADDR_LLADDR          {`CP0ADDR_REG_LEN'd17, `CP0ADDR_SEL_LEN'b000}
+
+// `define CP0ADDR_WATCHLO         {`CP0ADDR_REG_LEN'd18, `CP0ADDR_SEL_LEN'b???}
+
+// `define CP0ADDR_WATCHHI         {`CP0ADDR_REG_LEN'd19, `CP0ADDR_SEL_LEN'b???}
+
+// `define CP0ADDR_20_0            {`CP0ADDR_REG_LEN'd20, `CP0ADDR_SEL_LEN'b000} // Reserved
+
+// `define CP0ADDR_21_0            {`CP0ADDR_REG_LEN'd21, `CP0ADDR_SEL_LEN'b000} // Reserved
+// `define CP0ADDR_21_1            {`CP0ADDR_REG_LEN'd21, `CP0ADDR_SEL_LEN'b001} // Reserved
+// `define CP0ADDR_21_2            {`CP0ADDR_REG_LEN'd21, `CP0ADDR_SEL_LEN'b010} // Reserved
+// `define CP0ADDR_21_3            {`CP0ADDR_REG_LEN'd21, `CP0ADDR_SEL_LEN'b011} // Reserved
+// `define CP0ADDR_21_4            {`CP0ADDR_REG_LEN'd21, `CP0ADDR_SEL_LEN'b100} // Reserved
+// `define CP0ADDR_21_5            {`CP0ADDR_REG_LEN'd21, `CP0ADDR_SEL_LEN'b101} // Reserved
+// `define CP0ADDR_21_6            {`CP0ADDR_REG_LEN'd21, `CP0ADDR_SEL_LEN'b110} // Reserved
+// `define CP0ADDR_21_7            {`CP0ADDR_REG_LEN'd21, `CP0ADDR_SEL_LEN'b111} // Reserved
+
+// `define CP0ADDR_22_0            {`CP0ADDR_REG_LEN'd22, `CP0ADDR_SEL_LEN'b000} // Reserved
+// `define CP0ADDR_22_1            {`CP0ADDR_REG_LEN'd22, `CP0ADDR_SEL_LEN'b001} // Reserved
+// `define CP0ADDR_22_2            {`CP0ADDR_REG_LEN'd22, `CP0ADDR_SEL_LEN'b010} // Reserved
+// `define CP0ADDR_22_3            {`CP0ADDR_REG_LEN'd22, `CP0ADDR_SEL_LEN'b011} // Reserved
+// `define CP0ADDR_22_4            {`CP0ADDR_REG_LEN'd22, `CP0ADDR_SEL_LEN'b100} // Reserved
+// `define CP0ADDR_22_5            {`CP0ADDR_REG_LEN'd22, `CP0ADDR_SEL_LEN'b101} // Reserved
+// `define CP0ADDR_22_6            {`CP0ADDR_REG_LEN'd22, `CP0ADDR_SEL_LEN'b110} // Reserved
+// `define CP0ADDR_22_7            {`CP0ADDR_REG_LEN'd22, `CP0ADDR_SEL_LEN'b111} // Reserved
+
+// `define CP0ADDR_DEBUG           {`CP0ADDR_REG_LEN'd23, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_TRACECONTROL    {`CP0ADDR_REG_LEN'd23, `CP0ADDR_SEL_LEN'b001}
+// `define CP0ADDR_TRACECONTROL2   {`CP0ADDR_REG_LEN'd23, `CP0ADDR_SEL_LEN'b010}
+// `define CP0ADDR_USERTRACEDATA1  {`CP0ADDR_REG_LEN'd23, `CP0ADDR_SEL_LEN'b011}
+// `define CP0ADDR_TRACEIBPC       {`CP0ADDR_REG_LEN'd23, `CP0ADDR_SEL_LEN'b100}
+// `define CP0ADDR_TRACEDBPC       {`CP0ADDR_REG_LEN'd23, `CP0ADDR_SEL_LEN'b101}
+// `define CP0ADDR_DEBUG2          {`CP0ADDR_REG_LEN'd23, `CP0ADDR_SEL_LEN'b110}
+
+// `define CP0ADDR_DEPC            {`CP0ADDR_REG_LEN'd24, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_TRACECONTROL3   {`CP0ADDR_REG_LEN'd24, `CP0ADDR_SEL_LEN'b010}
+// `define CP0ADDR_USERTRACEDATA2  {`CP0ADDR_REG_LEN'd24, `CP0ADDR_SEL_LEN'b011}
+
+// `define CP0ADDR_PERFCNT         {`CP0ADDR_REG_LEN'd25, `CP0ADDR_SEL_LEN'b???}
+
+// `define CP0ADDR_ERRCTL          {`CP0ADDR_REG_LEN'd26, `CP0ADDR_SEL_LEN'b000}
+
+// `define CP0ADDR_CACHEERR        {`CP0ADDR_REG_LEN'd27, `CP0ADDR_SEL_LEN'b0??}
+
+// `define CP0ADDR_TAGLO           {`CP0ADDR_REG_LEN'd28, `CP0ADDR_SEL_LEN'b??0}
+// `define CP0ADDR_DATALO          {`CP0ADDR_REG_LEN'd28, `CP0ADDR_SEL_LEN'b??1}
+
+// `define CP0ADDR_TAGHI           {`CP0ADDR_REG_LEN'd29, `CP0ADDR_SEL_LEN'b??0}
+// `define CP0ADDR_DATAHI          {`CP0ADDR_REG_LEN'd29, `CP0ADDR_SEL_LEN'b??0}
+
+`define CP0ADDR_ERROREPC        {`CP0ADDR_REG_LEN'd30, `CP0ADDR_SEL_LEN'b000}
+
+// `define CP0ADDR_DESAVE          {`CP0ADDR_REG_LEN'd31, `CP0ADDR_SEL_LEN'b000}
+// `define CP0ADDR_KSCRATCH(n)     {`CP0ADDR_REG_LEN'd31, `CP0ADDR_SEL_LEN'dn+1}
+
+/* Address of Coprocessor 0 Registers: End */
+
+
+`endif

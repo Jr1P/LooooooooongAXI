@@ -2,3 +2,8 @@ xilinx_ip/*
 ram_wrap/*
 axi_wrap/*
 CONFREG/*
+*.xdc
+*.vhdl
+axi_cache_bridge*
+data_cache_data_ram*
+inst_cache_data_ram*

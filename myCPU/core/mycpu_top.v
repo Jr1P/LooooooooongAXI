@@ -185,33 +185,30 @@ module mycpu_top(
     wire        data_data_ok;
 
     reg reg_aresetn;
-    always @(posedge aclk)
+    reg reg_inst_data_ok;
+    reg reg_take;
+    reg [31:0] reg_target;
+    always @(posedge aclk) begin
         reg_aresetn <= aresetn;
+        reg_inst_data_ok <= inst_data_ok;
+        reg_take <= id_jump && id_branch;
+        reg_target <= id_target;
+    end
     assign inst_req = !reg_aresetn || (inst_addr_ok && !inst_data_ok) || inst_data_ok;
 
-    cpu_axi_interface u_cpu_axi_interface(
-        .clk        (aclk),
-        .resetn     (aresetn),
-
-        // *sram-like
+    inst_cache u_inst_cache(
+        .clk    (aclk),
+        .rstn   (aresetn),
+        .cache_req  (1'b0),
+        .cache_op   (7'b0),
+        .cache_tag  (32'b0),
+        .cache_op_ok(),
         .inst_req   (inst_req),
-        .inst_wr    (1'b0),     // * not write
-        .inst_size  (2'b11),    // * 4 bytes
+        .inst_size  (2'b11),
         .inst_addr  (inst_addr),
-        .inst_wdata (32'b0),
         .inst_rdata (inst_rdata),
         .inst_addr_ok   (inst_addr_ok),
         .inst_data_ok   (inst_data_ok),
-
-        .data_req   (data_req),
-        .data_wr    (data_wr),
-        .data_size  (data_size),
-        .data_addr  (data_addr),
-        .data_wdata (data_wdata),
-        .data_rdata (data_rdata),
-        .data_addr_ok   (data_addr_ok),
-        .data_data_ok   (data_data_ok),
-
         // * axi
         // * ar
         .arid   (arid),
@@ -260,9 +257,76 @@ module mycpu_top(
         .bready (bready)
     );
 
-    reg reg_inst_data_ok;
-    always @(posedge aclk)
-        reg_inst_data_ok <= inst_data_ok;
+    // cpu_axi_interface u_cpu_axi_interface(
+    //     .clk        (aclk),
+    //     .resetn     (aresetn),
+
+    //     // *sram-like
+    //     .inst_req   (inst_req),
+    //     .inst_wr    (1'b0),     // * not write
+    //     .inst_size  (2'b11),    // * 4 bytes
+    //     .inst_addr  (inst_addr),
+    //     .inst_wdata (32'b0),
+    //     .inst_rdata (inst_rdata),
+    //     .inst_addr_ok   (inst_addr_ok),
+    //     .inst_data_ok   (inst_data_ok),
+
+    //     .data_req   (data_req),
+    //     .data_wr    (data_wr),
+    //     .data_size  (data_size),
+    //     .data_addr  (data_addr),
+    //     .data_wdata (data_wdata),
+    //     .data_rdata (data_rdata),
+    //     .data_addr_ok   (data_addr_ok),
+    //     .data_data_ok   (data_data_ok),
+
+    //     // * axi
+    //     // * ar
+    //     .arid   (arid),
+    //     .araddr (araddr),
+    //     .arlen  (arlen),
+    //     .arsize (arsize),
+    //     .arburst(arburst),
+    //     .arlock (arlock),
+    //     .arcache(arcache),
+    //     .arprot (arprot),
+    //     .arvalid(arvalid),
+    //     .arready(arready),
+
+    //     // * r
+    //     .rid    (rid),
+    //     .rdata  (rdata),
+    //     .rresp  (rresp),
+    //     .rlast  (rlast),
+    //     .rvalid (rvalid),
+    //     .rready (rready),
+
+    //     // * aw
+    //     .awid   (awid),
+    //     .awaddr (awaddr),
+    //     .awlen  (awlen),
+    //     .awsize (awsize),
+    //     .awburst(awburst),
+    //     .awlock (awlock),
+    //     .awcache(awcache),
+    //     .awprot (awprot),
+    //     .awvalid(awvalid),
+    //     .awready(awready),
+
+    //     // * w
+    //     .wid    (wid),
+    //     .wdata  (wdata),
+    //     .wstrb  (wstrb),
+    //     .wlast  (wlast),
+    //     .wvalid (wvalid),
+    //     .wready (wready),
+        
+    //     // * b
+    //     .bid    (bid),
+    //     .bresp  (bresp),
+    //     .bvalid (bvalid),
+    //     .bready (bready)
+    // );
 
     cu u_cu(
         .id_pc      (id_pc),
@@ -322,8 +386,8 @@ module mycpu_top(
         .clk            (aclk),
         .resetn         (aresetn),
         .stall          (if_id_stall),
-        .BranchTarget   (id_target),
-        .BranchTake     (id_branch && id_jump),
+        .BranchTarget   (reg_target),
+        .BranchTake     (reg_take),
         .exc_oc         (ex_exc_oc),
 
         .eret           (id_eret),  // * eret
@@ -599,6 +663,73 @@ module mycpu_top(
     wire exc_valid = cp0_status[`Status_EXL] ? !wb_eret : // * valid 1 : 表示有例外在处理, 刚传到ex段的例外也算属于在处理
                     ext_int_response ? 1'b1 : |EX_ex;
     wire [31:0] cp0_wdata = wb_regwen && ex_rt == wb_wreg ? wb_reorder_data : ex_wdata;
+
+      data_cache u_data_cache(
+        .clk    (aclk),
+        .rstn   (aresetn),
+        .en     (1'b1),
+        .cache_req  (1'b0),
+        .cache_op   (7'b0),
+        .cache_tag  (32'b0),
+        .cache_op_ok(),
+
+        .data_req   (data_req),
+        .data_wr    (data_wr),
+        .data_size  (data_wen),
+        .data_addr  (data_addr),
+        .data_wdata (cp0_wdata),
+        .data_wstrb (data_wen << data_addr[1:0]),
+        .data_rdata (data_rdata),
+        .data_addr_ok   (data_addr_ok),
+        .data_data_ok   (data_data_ok),
+        // * axi
+        // * ar
+        .arid   (arid),
+        .araddr (araddr),
+        .arlen  (arlen),
+        .arsize (arsize),
+        .arburst(arburst),
+        .arlock (arlock),
+        .arcache(arcache),
+        .arprot (arprot),
+        .arvalid(arvalid),
+        .arready(arready),
+
+        // * r
+        .rid    (rid),
+        .rdata  (rdata),
+        .rresp  (rresp),
+        .rlast  (rlast),
+        .rvalid (rvalid),
+        .rready (rready),
+
+        // * aw
+        .awid   (awid),
+        .awaddr (awaddr),
+        .awlen  (awlen),
+        .awsize (awsize),
+        .awburst(awburst),
+        .awlock (awlock),
+        .awcache(awcache),
+        .awprot (awprot),
+        .awvalid(awvalid),
+        .awready(awready),
+
+        // * w
+        .wid    (wid),
+        .wdata  (wdata),
+        .wstrb  (wstrb),
+        .wlast  (wlast),
+        .wvalid (wvalid),
+        .wready (wready),
+        
+        // * b
+        .bid    (bid),
+        .bresp  (bresp),
+        .bvalid (bvalid),
+        .bready (bready)
+    );
+
     // * 重定向一致 cp0_wdata, data_sram_wdata
     assign data_sram_wdata = {  {8{ex_lsV[3]}} & cp0_wdata[31:24],
                                 {8{ex_lsV[2]}} & cp0_wdata[23:16],
