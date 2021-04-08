@@ -20,6 +20,8 @@ module ex_wb_seg (
     input           ex_regwen,
     input [4 :0]    ex_wreg,
     
+    input           ex_data_req,
+
     input           ex_eret,
     input           ex_cp0ren,
     input [31:0]    ex_cp0rdata,
@@ -37,6 +39,8 @@ module ex_wb_seg (
 
     output reg          wb_regwen,
     output reg [4 :0]   wb_wreg,
+
+    output reg          wb_data_req,
 
     output reg          wb_eret,
     output reg          wb_cp0ren,
@@ -57,6 +61,7 @@ module ex_wb_seg (
             wb_al       <= 1'b0;
             wb_regwen   <= 1'b0;
             wb_wreg     <= 5'b0;
+            wb_data_req <= 1'b0;
             wb_eret     <= 1'b0;
             wb_cp0ren   <= 1'b0;
             wb_cp0rdata <= 32'b0;
@@ -74,6 +79,7 @@ module ex_wb_seg (
             wb_al       <= ex_al;
             wb_regwen   <= ex_regwen;
             wb_wreg     <= ex_wreg;
+            wb_data_req <= ex_data_req;
             wb_eret     <= ex_eret;
             wb_cp0ren   <= ex_cp0ren;
             wb_cp0rdata <= ex_cp0rdata;

@@ -28,36 +28,35 @@ module inst_cache(
     input         clk,
     input         rstn,
     //cache op
-     input		  cache_req,
-	 input	[6:0] cache_op,
-	input   [31:0]cache_tag,
-	 output		  cache_op_ok,
+    input		  cache_req,
+    input	[6:0] cache_op,
+    input   [31:0]cache_tag,
+    output		  cache_op_ok,
     // from cpu, sram like
-     input         inst_req,
+    input         inst_req,
     input  [1:0]  inst_size,
-     input  [`PC_WIDTH-1:0] inst_addr,
-    input  [`INS_LEN-1:0] inst_wdata,
-     output [`INS_LEN-1:0] inst_rdata,
-     output        inst_addr_ok,
-     output        inst_data_ok,
+    input  [`PC_WIDTH-1:0] inst_addr,
+    output [`INS_LEN-1:0] inst_rdata,
+    output        inst_addr_ok,
+    output        inst_data_ok,
     //axi
-     output [3 :0] arid   ,
-     output [31:0] araddr ,
+    output [3 :0] arid   ,
+    output [31:0] araddr ,
     output [7 :0] arlen  ,
     output [2 :0] arsize ,
     output [1 :0] arburst,
     output [1 :0] arlock ,
     output [3 :0] arcache,
     output [2 :0] arprot ,
-     output        arvalid,
-     input         arready,
+    output        arvalid,
+    input         arready,
 
-     input  [3 :0] rid    ,
-     input  [31:0] rdata  ,
+    input  [3 :0] rid    ,
+    input  [31:0] rdata  ,
     input  [1 :0] rresp ,
-     input         rlast ,
-     input         rvalid ,
-     output        rready,
+    input         rlast ,
+    input         rvalid ,
+    output        rready,
 
     output [3 :0] awid   ,
     output [31:0] awaddr ,
@@ -416,8 +415,8 @@ module inst_cache(
             hit_when_refill <= 1'b0;
         end
         else begin
-            // hit_when_refill <= hit_when_refill_d;
-            hit_when_refill <= 1'b0;;
+            hit_when_refill <= hit_when_refill_d;
+            // hit_when_refill <= 1'b0;
         end
     end
 
@@ -512,8 +511,8 @@ module inst_cache(
             pre_hit <= 1'b0;
         end
         else begin
-            pre_hit <= 1'b0;
-            // pre_hit <= pre_hit_d;
+            // pre_hit <= 1'b0;
+            pre_hit <= pre_hit_d;
         end
     end
 
@@ -543,6 +542,8 @@ module inst_cache(
         end
     end
 
+    parameter CACHE_INST = 4'b1100;
+    wire cache_inst = !(state_d ^ CACHE_INST);
     always @(posedge clk) begin
         if (!rstn) begin
             pre_write_buffer_valid <= 8'b0;
@@ -592,8 +593,6 @@ module inst_cache(
         end
     end
     //-----------Cache Inst--------------
-    parameter CACHE_INST = 4'b1100;
-    wire cache_inst = !(state_d ^ CACHE_INST);
 
     parameter CACHE_IDLE            = 3'b000;
     parameter CACHE_INDEX_INVALID   = 3'b001;
@@ -775,8 +774,9 @@ module inst_cache(
                                                             WAIT_FOR_PRE_REFILL:
                                                             WAIT_FOR_PRE_AXI:
                                             (pre_miss)?RUN:MISS
-                                        ):
+                                        ): 
                                         RUN;
+                                        // * !pre_hit ? MISS : RUN;
                 MISS:    state <= (arready & data_ready)? WAIT_FOR_AXI:MISS;
                 WAIT_FOR_AXI: state <= (rvalid & data_back)?REFILL:WAIT_FOR_AXI;
                 WAIT_FOR_PRE_AXI: state <= (pre_finish | pre_write_back | pre_run)?WAIT_FOR_PRE_REFILL:WAIT_FOR_PRE_AXI;

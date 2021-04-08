@@ -2,58 +2,46 @@
 `include "./head.vh"
 
 // * five segment pipeline cpu
-module mycpu_top(
+module cpu_core(
     input   [5 :0]  ext_int,        // *硬件中断
 
     input           aclk,
     input           aresetn,
 
-    output  [3 :0]  arid,
-    output  [31:0]  araddr,
-    output  [3 :0]  arlen,
-    output  [2 :0]  arsize,
-    output  [1 :0]  arburst,
-    output  [1 :0]  arlock,
-    output  [3 :0]  arcache,
-    output  [2 :0]  arprot,
-    output          arvalid,
-    input           arready,
+    output          inst_req,
+    output          inst_cache,
+    output  [31:0]  inst_addr,
+    input   [31:0]  inst_rdata,
+    input           inst_addr_ok,
+    input           inst_data_ok,
 
-    input   [3 :0]  rid,
-    input   [31:0]  rdata,
-    input   [1 :0]  rresp,
-    input           rlast,
-    input           rvalid,
-    output          rready,
+    output          data_req,
+    output          data_wr,
+    output          data_cache,
+    output  [3 :0]  data_wstrb,
+    output  [31:0]  data_addr,
+    output  [1 :0]  data_size,
+    output  [31:0]  data_wdata,
+    input   [31:0]  data_rdata,
+    input           data_addr_ok,
+    input           data_data_ok,
 
-    output  [3 :0]  awid,
-    output  [31:0]  awaddr,
-    output  [3 :0]  awlen,
-    output  [2 :0]  awsize,
-    output  [1 :0]  awburst,
-    output  [1 :0]  awlock,
-    output  [3 :0]  awcache,
-    output  [2 :0]  awprot,
-    output          awvalid,
-    input           awready,
-
-    input   [3 :0]  wid,
-    input   [31:0]  wdata,
-    input   [3 :0]  wstrb,
-    input           wlast,
-    input           wvalid,
-    output          wready,
-
-    input   [3 :0]  bid,
-    input   [1 :0]  bresp,
-    input           bvalid,
-    input           bready,
+    output          cache_req,
+    output  [6 :0]  cache_op,
+    output  [31:0]  cache_tag,
+    input           cache_over,
 
     output  [31:0]  debug_wb_pc,
     output  [3 :0]  debug_wb_rf_wen,
     output  [4 :0]  debug_wb_rf_wnum,
     output  [31:0]  debug_wb_rf_wdata
 );
+
+    assign inst_cache = 1'b1; // * TLB相关，后续需要修改
+    assign data_cache = 1'b1;
+    assign cache_req = 1'b0;
+    assign cache_op = 7'b0;
+    assign cache_tag = 32'b0;
 
     // *Exceptions
     // TODO: TLB exceptions refill, invalid, modified
@@ -146,6 +134,7 @@ module mycpu_top(
     wire        wb_al;
     wire        wb_regwen;
     wire [4 :0] wb_wreg;
+    wire        wb_data_req;
     wire        wb_eret;
     wire        wb_cp0ren;
     wire [31:0] wb_cp0rdata;
@@ -154,7 +143,7 @@ module mycpu_top(
 
     wire [31:0] cp0_epc;
 
-    wire    cu_stall;
+    wire    pre_ins;
 
     wire    if_id_stall;
     wire    id_ex_stall;
@@ -166,174 +155,26 @@ module mycpu_top(
 
     wire    div_stall;
 
-    //inst sram-like 
-    wire        inst_req;
-    wire [31:0] inst_addr   ;
-    wire [31:0] inst_wdata  ;
-    wire [31:0] inst_rdata  ;
-    wire        inst_addr_ok;
-    wire        inst_data_ok;
-    
-    //data sram-like 
-    wire        data_req    ;
-    wire        data_wr     ;
-    wire [1 :0] data_size   ;
-    wire [31:0] data_addr   ;
-    wire [31:0] data_wdata  ;
-    wire [31:0] data_rdata  ;
-    wire        data_addr_ok;
-    wire        data_data_ok;
+    // reg inst_cache_state;
+    // parameter IDLE          =   1'b0;
+    // parameter BUSY          =   1'b1;
+    // always @(posedge aclk)
+    //     inst_cache_state    <=  !aresetn        ? IDLE :
+    //                             inst_addr_ok    ? BUSY :
+    //                             inst_data_ok    ? IDLE :
+    //                             inst_cache_state       ;
 
-    reg reg_aresetn;
-    reg reg_inst_data_ok;
-    reg reg_take;
-    reg [31:0] reg_target;
-    always @(posedge aclk) begin
-        reg_aresetn <= aresetn;
-        reg_inst_data_ok <= inst_data_ok;
-        reg_take <= id_jump && id_branch;
-        reg_target <= id_target;
-    end
-    assign inst_req = !reg_aresetn || (inst_addr_ok && !inst_data_ok) || inst_data_ok;
-
-    inst_cache u_inst_cache(
-        .clk    (aclk),
-        .rstn   (aresetn),
-        .cache_req  (1'b0),
-        .cache_op   (7'b0),
-        .cache_tag  (32'b0),
-        .cache_op_ok(),
-        .inst_req   (inst_req),
-        .inst_size  (2'b11),
-        .inst_addr  (inst_addr),
-        .inst_rdata (inst_rdata),
-        .inst_addr_ok   (inst_addr_ok),
-        .inst_data_ok   (inst_data_ok),
-        // * axi
-        // * ar
-        .arid   (arid),
-        .araddr (araddr),
-        .arlen  (arlen),
-        .arsize (arsize),
-        .arburst(arburst),
-        .arlock (arlock),
-        .arcache(arcache),
-        .arprot (arprot),
-        .arvalid(arvalid),
-        .arready(arready),
-
-        // * r
-        .rid    (rid),
-        .rdata  (rdata),
-        .rresp  (rresp),
-        .rlast  (rlast),
-        .rvalid (rvalid),
-        .rready (rready),
-
-        // * aw
-        .awid   (awid),
-        .awaddr (awaddr),
-        .awlen  (awlen),
-        .awsize (awsize),
-        .awburst(awburst),
-        .awlock (awlock),
-        .awcache(awcache),
-        .awprot (awprot),
-        .awvalid(awvalid),
-        .awready(awready),
-
-        // * w
-        .wid    (wid),
-        .wdata  (wdata),
-        .wstrb  (wstrb),
-        .wlast  (wlast),
-        .wvalid (wvalid),
-        .wready (wready),
-        
-        // * b
-        .bid    (bid),
-        .bresp  (bresp),
-        .bvalid (bvalid),
-        .bready (bready)
-    );
-
-    // cpu_axi_interface u_cpu_axi_interface(
-    //     .clk        (aclk),
-    //     .resetn     (aresetn),
-
-    //     // *sram-like
-    //     .inst_req   (inst_req),
-    //     .inst_wr    (1'b0),     // * not write
-    //     .inst_size  (2'b11),    // * 4 bytes
-    //     .inst_addr  (inst_addr),
-    //     .inst_wdata (32'b0),
-    //     .inst_rdata (inst_rdata),
-    //     .inst_addr_ok   (inst_addr_ok),
-    //     .inst_data_ok   (inst_data_ok),
-
-    //     .data_req   (data_req),
-    //     .data_wr    (data_wr),
-    //     .data_size  (data_size),
-    //     .data_addr  (data_addr),
-    //     .data_wdata (data_wdata),
-    //     .data_rdata (data_rdata),
-    //     .data_addr_ok   (data_addr_ok),
-    //     .data_data_ok   (data_data_ok),
-
-    //     // * axi
-    //     // * ar
-    //     .arid   (arid),
-    //     .araddr (araddr),
-    //     .arlen  (arlen),
-    //     .arsize (arsize),
-    //     .arburst(arburst),
-    //     .arlock (arlock),
-    //     .arcache(arcache),
-    //     .arprot (arprot),
-    //     .arvalid(arvalid),
-    //     .arready(arready),
-
-    //     // * r
-    //     .rid    (rid),
-    //     .rdata  (rdata),
-    //     .rresp  (rresp),
-    //     .rlast  (rlast),
-    //     .rvalid (rvalid),
-    //     .rready (rready),
-
-    //     // * aw
-    //     .awid   (awid),
-    //     .awaddr (awaddr),
-    //     .awlen  (awlen),
-    //     .awsize (awsize),
-    //     .awburst(awburst),
-    //     .awlock (awlock),
-    //     .awcache(awcache),
-    //     .awprot (awprot),
-    //     .awvalid(awvalid),
-    //     .awready(awready),
-
-    //     // * w
-    //     .wid    (wid),
-    //     .wdata  (wdata),
-    //     .wstrb  (wstrb),
-    //     .wlast  (wlast),
-    //     .wvalid (wvalid),
-    //     .wready (wready),
-        
-    //     // * b
-    //     .bid    (bid),
-    //     .bresp  (bresp),
-    //     .bvalid (bvalid),
-    //     .bready (bready)
-    // );
+    assign inst_req = 1'b1; // * !inst_cache_state || inst_data_ok;
 
     cu u_cu(
         .id_pc      (id_pc),
 
         .inst_req       (inst_req),
-        .inst_data_ok   (reg_inst_data_ok),
-        .data_req       (data_req),
+        .inst_addr_ok   (inst_addr_ok),
+        .inst_data_ok   (inst_data_ok),
+
+        .data_req       (wb_data_req && wb_load), // * 取数请求
+        .data_addr_ok   (data_addr_ok),
         .data_data_ok   (data_data_ok),
 
         .ex_rs_ren  (ex_rs_ren),
@@ -355,7 +196,7 @@ module mycpu_top(
         .ex_cp0ren  (ex_cp0ren),
         .ex_wreg    (ex_wreg),
 
-        .ex_stall   (cu_stall),
+        .pre_ins    (pre_ins),
         .div_stall  (div_stall),
 
         .if_id_stall    (if_id_stall),
@@ -386,8 +227,8 @@ module mycpu_top(
         .clk            (aclk),
         .resetn         (aresetn),
         .stall          (if_id_stall),
-        .BranchTarget   (reg_target),
-        .BranchTake     (reg_take),
+        .BranchTarget   (id_target),
+        .BranchTake     (id_jump && id_branch),
         .exc_oc         (ex_exc_oc),
 
         .eret           (id_eret),  // * eret
@@ -395,7 +236,7 @@ module mycpu_top(
         .npc            (npc)
     );
 
-    assign inst_addr = !cu_stall ? npc : npc-32'd4;
+    assign inst_addr = !pre_ins ? npc : npc-32'd4;
     // assign inst_addr = npc-32'd4;
     assign if_inst_ADDRESS_ERROR = inst_addr[1:0] != 2'b00;
 
@@ -641,10 +482,10 @@ module mycpu_top(
     assign data_req = ex_data_en && !ex_data_ADDRESS_ERROR;
     assign data_addr = ex_res & 32'h1fff_ffff;
     assign data_wr = |ex_data_wen;
-    assign data_size = ex_data_wen;
+    assign data_size = ex_lsV[3] ? 2'b10 : ex_lsV[1] ? 2'b01 : 2'b00;
     assign ex_data_ADDRESS_ERROR = ex_data_en && (ex_load && (ex_data_ren == 4'b0011 && data_addr[0] || ex_data_ren == 4'b1111 && data_addr[1:0] != 2'b00)
                                     || !ex_load && (ex_data_wen == 4'b0011 && data_addr[0] || ex_data_wen == 4'b1111 && data_addr[1:0] != 2'b00));
- 
+    wire ex_data_req = data_req;
 
     wire [`EXBITS] EX_ex = {ex_addr_error, ex_ex} | {2'b0, ex_IntegerOverflow, 2'b0, ex_data_ADDRESS_ERROR};
     wire [4:0] exc_excode = ext_int ? `EXC_INT :
@@ -664,77 +505,12 @@ module mycpu_top(
                     ext_int_response ? 1'b1 : |EX_ex;
     wire [31:0] cp0_wdata = wb_regwen && ex_rt == wb_wreg ? wb_reorder_data : ex_wdata;
 
-      data_cache u_data_cache(
-        .clk    (aclk),
-        .rstn   (aresetn),
-        .en     (1'b1),
-        .cache_req  (1'b0),
-        .cache_op   (7'b0),
-        .cache_tag  (32'b0),
-        .cache_op_ok(),
-
-        .data_req   (data_req),
-        .data_wr    (data_wr),
-        .data_size  (data_wen),
-        .data_addr  (data_addr),
-        .data_wdata (cp0_wdata),
-        .data_wstrb (data_wen << data_addr[1:0]),
-        .data_rdata (data_rdata),
-        .data_addr_ok   (data_addr_ok),
-        .data_data_ok   (data_data_ok),
-        // * axi
-        // * ar
-        .arid   (arid),
-        .araddr (araddr),
-        .arlen  (arlen),
-        .arsize (arsize),
-        .arburst(arburst),
-        .arlock (arlock),
-        .arcache(arcache),
-        .arprot (arprot),
-        .arvalid(arvalid),
-        .arready(arready),
-
-        // * r
-        .rid    (rid),
-        .rdata  (rdata),
-        .rresp  (rresp),
-        .rlast  (rlast),
-        .rvalid (rvalid),
-        .rready (rready),
-
-        // * aw
-        .awid   (awid),
-        .awaddr (awaddr),
-        .awlen  (awlen),
-        .awsize (awsize),
-        .awburst(awburst),
-        .awlock (awlock),
-        .awcache(awcache),
-        .awprot (awprot),
-        .awvalid(awvalid),
-        .awready(awready),
-
-        // * w
-        .wid    (wid),
-        .wdata  (wdata),
-        .wstrb  (wstrb),
-        .wlast  (wlast),
-        .wvalid (wvalid),
-        .wready (wready),
-        
-        // * b
-        .bid    (bid),
-        .bresp  (bresp),
-        .bvalid (bvalid),
-        .bready (bready)
-    );
-
-    // * 重定向一致 cp0_wdata, data_sram_wdata
-    assign data_sram_wdata = {  {8{ex_lsV[3]}} & cp0_wdata[31:24],
-                                {8{ex_lsV[2]}} & cp0_wdata[23:16],
-                                {8{ex_lsV[1]}} & cp0_wdata[15: 8],
-                                {8{ex_lsV[0]}} & cp0_wdata[7 : 0]} << {data_addr[1:0], 3'b000};
+    // * 重定向一致 cp0_wdata, data_wdata
+    assign data_wdata = {   {8{ex_lsV[3]}} & cp0_wdata[31:24],
+                            {8{ex_lsV[2]}} & cp0_wdata[23:16],
+                            {8{ex_lsV[1]}} & cp0_wdata[15: 8],
+                            {8{ex_lsV[0]}} & cp0_wdata[7 : 0]}; // << {data_addr[1:0], 3'b0};
+    assign data_wstrb = ex_data_wen << data_addr[1:0];
 
     assign ex_exc_oc = !cp0_status[`Status_EXL] && exc_valid;
     wire [31:0] exc_badvaddr = EX_ex[5] ? ex_pc : ex_res;
@@ -767,7 +543,7 @@ module mycpu_top(
         .clk    (aclk),
         .resetn (aresetn),
 
-        .stall  (ex_wb_stall || (data_req && !data_data_ok)),
+        .stall  (ex_wb_stall),
         .refresh(ex_wb_refresh),
 
         .ex_pc          (ex_pc),
@@ -780,6 +556,7 @@ module mycpu_top(
         .ex_al          (ex_al),
         .ex_regwen      (ex_regwen),
         .ex_wreg        (ex_wreg),
+        .ex_data_req    (ex_data_req),
         .ex_eret        (ex_eret),
         .ex_cp0ren      (ex_cp0ren),
         .ex_cp0rdata    (ex_cp0rdata),
@@ -796,6 +573,7 @@ module mycpu_top(
         .wb_al          (wb_al),
         .wb_regwen      (wb_regwen),
         .wb_wreg        (wb_wreg),
+        .wb_data_req    (wb_data_req),
         .wb_eret        (wb_eret),
         .wb_cp0ren      (wb_cp0ren),
         .wb_cp0rdata    (wb_cp0rdata),
@@ -803,7 +581,7 @@ module mycpu_top(
         .wb_hilordata   (wb_hilordata)
     );
 
-    wire [31:0] wb_data_rdata = data_rdata >> {wb_data_addr, 3'b0};
+    wire [31:0] wb_data_rdata = data_rdata; // >> {wb_data_addr, 3'b0};
 
     assign wb_rdata[7 : 0] =    {8{wb_lsV[0]}} & wb_data_rdata[7:0];
     assign wb_rdata[15: 8] =    {8{wb_lsV[1]}} & wb_data_rdata[15:8] |

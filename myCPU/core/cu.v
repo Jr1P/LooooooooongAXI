@@ -5,8 +5,11 @@ module cu(
     input [31:0]id_pc,
 
     input       inst_req,
+    input       inst_addr_ok,
     input       inst_data_ok,
+
     input       data_req,
+    input       data_addr_ok,
     input       data_data_ok,
 
     input       ex_rs_ren,
@@ -28,7 +31,7 @@ module cu(
     input ex_cp0ren,
     input [4:0] ex_wreg,
 
-    output  ex_stall,
+    output  pre_ins,
 
     input   div_stall,
 
@@ -43,17 +46,19 @@ module cu(
 
     wire ex_rel_rs  = id_branch && id_rs_ren && ex_regwen && ex_wreg == id_rs;
     wire ex_rel_rt  = id_branch && id_rt_ren && ex_regwen && ex_wreg == id_rt;
-    assign ex_stall = (ex_rel_rs || ex_rel_rt) && ex_load || div_stall; // * ex段 数据相关导致分支预测暂停或除法暂停
 
-    wire inst_stall = !inst_data_ok;
-    wire data_stall = data_req && !data_data_ok;
+    wire inst_stall = (inst_req && !inst_addr_ok) || !inst_data_ok;
+    // // wire data_stall = data_req && !data_data_ok; // * 没返回时持续将data_req挂高
 
-    assign ex_wb_stall = 1'b0;
-    assign id_ex_stall = div_stall || data_stall;  // *id recode
-    assign if_id_stall = id_pc && (ex_stall || div_stall || inst_stall || data_stall);
+    wire ex_stall = (ex_rel_rs || ex_rel_rt) && ex_load || div_stall; // * ex段 数据相关导致分支预测暂停或除法暂停
+    assign pre_ins = ex_stall;
+
+    assign ex_wb_stall = data_req && !data_data_ok; // * 没返回时持续将data_req挂高
+    assign id_ex_stall = div_stall || ex_wb_stall;  // *id recode
+    assign if_id_stall = id_pc && (ex_stall || inst_stall || id_ex_stall);
 
     assign if_id_refresh = exc_oc || eret;
-    assign id_ex_refresh = exc_oc || (ex_stall && !div_stall);
-    assign ex_wb_refresh = exc_oc || div_stall || data_stall;
+    assign id_ex_refresh = !id_ex_stall && (exc_oc || (ex_stall && !div_stall) || if_id_stall);
+    assign ex_wb_refresh = exc_oc || div_stall;
 
 endmodule

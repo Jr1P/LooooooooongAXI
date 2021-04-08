@@ -26,7 +26,7 @@
 module data_cache(
     input         clk,
     input         rstn,
-    input         en,
+    // input         en,
 	input  cache_req,
 	input  [6:0] cache_op,
 	input  [31:0]cache_tag,
@@ -253,6 +253,7 @@ module data_cache(
     wire cache_hit;
     assign cache_hit = !(!hit_array);
     wire write_hit;
+    reg last_wr;
     assign write_hit = hit & last_wr & ok_ready; 
     wire [1:0] write_hit_array = (ok_ready & last_wr)?hit_array:`DATA_CACHE_ASSO'b0;//FIXME:
 
@@ -270,6 +271,7 @@ module data_cache(
                     data_rdata_buf_0[4],data_rdata_buf_0[5],data_rdata_buf_0[6],data_rdata_buf_0[7]} = bank_rdata[0];
     assign {data_rdata_buf_1[0],data_rdata_buf_1[1],data_rdata_buf_1[2],data_rdata_buf_1[3],
                     data_rdata_buf_1[4],data_rdata_buf_1[5],data_rdata_buf_1[6],data_rdata_buf_1[7]} = bank_rdata[1];
+    reg [`DATA_CACHE_OFFSET_WIDTH-1:0] last_offset;
     assign data_data[0] = data_rdata_buf_0[last_offset[4:2]];
     assign data_data[1] = data_rdata_buf_1[last_offset[4:2]];
 
@@ -369,13 +371,12 @@ module data_cache(
     reg         pre_write_data_ok_return;
     //--------------Last Value----------------
     reg                                last_req;
-    reg last_wr;
     reg [3:0]                          last_wstrb;
     reg [31:0]                         last_addr;
     reg [31:0]                         last_wdata;
     reg [`DATA_CACHE_TAG_WIDTH-1   :0] last_tag;
     reg [`DATA_CACHE_INDEX_WIDTH-1 :0] last_index;
-    reg [`DATA_CACHE_OFFSET_WIDTH-1:0] last_offset;
+
     reg [`DATA_CACHE_ASSO-1:0]         last_way_sel;
     reg                                last_hit;
     reg [`DATA_CACHE_ASSO-1:0]         last_hit_array;
@@ -1228,7 +1229,7 @@ module data_cache(
                                         RUN;
                 WAIT_MISS: state <= (victim_idle)?MISS:WAIT_MISS;
                 MISS:    state <= (arready & data_ready)? WAIT_FOR_AXI:MISS;
-                WAIT_FOR_AXI: state <= (rvalid & data_back)?REFILL:WAIT_FOR_AXI;
+                WAIT_FOR_AXI: state <= (rvalid & data_back)?(rlast ? FINISH : REFILL):WAIT_FOR_AXI;
                 WAIT_FOR_PRE_AXI: state <= (pre_get_write_line | pre_write_back | pre_run)?WAIT_FOR_PRE_REFILL:WAIT_FOR_PRE_AXI;
                 REFILL:  state <= (rlast & rvalid & data_back)?FINISH:REFILL;
                 WAIT_FOR_PRE_REFILL: state <= (pre_write_back | pre_run)?IDLE:WAIT_FOR_PRE_REFILL;
