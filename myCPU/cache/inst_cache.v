@@ -266,8 +266,6 @@ module inst_cache(
         else if (inst_data_ok) begin
             last_req <= 1'b0;
         end
-        else begin
-        end
     end 
     //--------------Stored Value-------------
     reg                                wreq;
@@ -684,6 +682,8 @@ module inst_cache(
 
     assign inst_addr_ok = inst_req & !cache_req & (run | hit_when_refill | pre_hit) & (ok_ready?inst_data_ok:1'b1);
     assign inst_data_ok = last_req & (hit | hit_when_refill | pre_hit);
+    // assign inst_addr_ok = inst_req & !cache_req & (run | hit_when_refill_d | pre_hit_d) & (ok_ready?inst_data_ok:1'b1);
+    // assign inst_data_ok = /*last_req & */(hit | hit_when_refill_d | pre_hit_d);
     assign inst_rdata = (hit_when_refill)? hit_when_refill_word:
                                 (pre_hit)? pre_hit_word: 
                                         data_rdata[bank_sel];

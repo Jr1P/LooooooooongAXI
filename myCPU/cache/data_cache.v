@@ -42,6 +42,8 @@ module data_cache(
     output [`SRAM_WDATA_WIDTH-1:0] data_rdata,
     output data_addr_ok,
     output data_data_ok,
+    // output hit_when_refill_o,
+    // output  [31:0] hit_when_refill_word_o,
     //AXI
     //ar
     output  [3 :0] arid,
@@ -1068,15 +1070,25 @@ module data_cache(
         else begin
         end
     end
+    // reg pre_hit_when_refill;
+
+    // always @(posedge clk) begin
+    //     if (!rstn) pre_hit_when_refill <= 1'b0;      
+    //     else pre_hit_when_refill <= hit_when_refill;
+    // end
 
     //TODO: add pre_hit found//FIXME: addr_ok may have bug
     assign data_addr_ok = data_req & !cache_req & (run | hit_when_refill | pre_hit) & (ok_ready?data_data_ok:1'b1);
     assign data_data_ok = last_req & (hit | hit_when_refill | pre_hit);//FIXME: may have bug:use read_hit
     assign data_rdata   =     (is_writting)?redi_word:
-                                (hit_when_refill)? hit_when_refill_word://TODO:FIXME:add redirector
+                                (hit_when_refill) ? hit_when_refill_word :
+                                // (hit_when_refill)? cont_mem ? write_buffer[offset[4:2]] : write_buffer[last_offset[4:2]]: //TODO:FIXME:add redirector
                                 //TODO: change 1
                                 (pre_hit)? pre_hit_word: 
+                                // (last_wr)? {{8{last_wstrb[3]}}, {8{last_wstrb[2]}}, {8{last_wstrb[1]}}, 8{last_wstrb[0]}} & last_wdata
                                         data_data[hit_array[1]];
+    // assign hit_when_refill_o = hit_when_refill;
+    // assign hit_when_refill_word_o = hit_when_refill_word;
     //--------------TagV and Data---------------
     assign tagv_wen = (resetn)?`DATA_CACHE_ASSO'b11:
                         // (miss)?way_sel://TODO: pre_refill
@@ -1230,6 +1242,7 @@ module data_cache(
                 WAIT_MISS: state <= (victim_idle)?MISS:WAIT_MISS;
                 MISS:    state <= (arready & data_ready)? WAIT_FOR_AXI:MISS;
                 WAIT_FOR_AXI: state <= (rvalid & data_back)?(rlast ? FINISH : REFILL):WAIT_FOR_AXI;
+                // WAIT_FOR_AXI: state <= (rvalid & data_back)?REFILL:WAIT_FOR_AXI;
                 WAIT_FOR_PRE_AXI: state <= (pre_get_write_line | pre_write_back | pre_run)?WAIT_FOR_PRE_REFILL:WAIT_FOR_PRE_AXI;
                 REFILL:  state <= (rlast & rvalid & data_back)?FINISH:REFILL;
                 WAIT_FOR_PRE_REFILL: state <= (pre_write_back | pre_run)?IDLE:WAIT_FOR_PRE_REFILL;

@@ -15,6 +15,9 @@ module cpu_core(
     input           inst_addr_ok,
     input           inst_data_ok,
 
+    // input           hit_when_refill_i,
+    // input   [31:0]  hit_when_refill_word_i,
+
     output          data_req,
     output          data_wr,
     output          data_cache,
@@ -140,6 +143,7 @@ module cpu_core(
     wire [31:0] wb_cp0rdata;
     wire [1 :0] wb_hiloren;
     wire [31:0] wb_hilordata;
+    wire        wb_hit_when_refill;
 
     wire [31:0] cp0_epc;
 
@@ -152,19 +156,27 @@ module cpu_core(
     wire    if_id_refresh;
     wire    id_ex_refresh;
     wire    ex_wb_refresh;
+    wire    ex_wb_write_disable;
+    wire    wb_last_refresh;
 
     wire    div_stall;
+    
+    // reg last_if_stall;
+    // always @(posedge aclk) begin
+    //     if(!aresetn) last_if_stall <= 1'b0;
+    //     else last_if_stall <= if_id_stall;
+    // end
 
-    // reg inst_cache_state;
-    // parameter IDLE          =   1'b0;
-    // parameter BUSY          =   1'b1;
-    // always @(posedge aclk)
-    //     inst_cache_state    <=  !aresetn        ? IDLE :
-    //                             inst_addr_ok    ? BUSY :
-    //                             inst_data_ok    ? IDLE :
-    //                             inst_cache_state       ;
+    reg inst_cache_state;
+    parameter IDLE          =   1'b0;
+    parameter BUSY          =   1'b1;
+    always @(posedge aclk)
+        inst_cache_state    <=  !aresetn        ? IDLE :
+                                inst_addr_ok    ? BUSY :
+                                inst_data_ok    ? IDLE :
+                                inst_cache_state       ;
 
-    assign inst_req = 1'b1; // * !inst_cache_state || inst_data_ok;
+    assign inst_req = (!inst_cache_state || inst_data_ok)/* && !last_if_stall*/; // * !inst_cache_state || inst_data_ok;
 
     cu u_cu(
         .id_pc      (id_pc),
@@ -173,9 +185,13 @@ module cpu_core(
         .inst_addr_ok   (inst_addr_ok),
         .inst_data_ok   (inst_data_ok),
 
-        .data_req       (wb_data_req && wb_load), // * 取数请求
+        .data_req_pre   (wb_data_req && wb_load),   // * 取数请求
+        .data_req       (data_req),
         .data_addr_ok   (data_addr_ok),
         .data_data_ok   (data_data_ok),
+        .data_wr        (data_wr),
+
+        // .wb_hit_when_refill (hit_when_refill_i),
 
         .ex_rs_ren  (ex_rs_ren),
         .ex_rs      (ex_rs),
@@ -206,6 +222,7 @@ module cpu_core(
         .if_id_refresh  (if_id_refresh),
         .id_ex_refresh  (id_ex_refresh),
         .ex_wb_refresh  (ex_wb_refresh)
+        // .ex_wb_write_disable    (ex_wb_write_disable)
 );
 
     // * 重定向数据
@@ -241,9 +258,11 @@ module cpu_core(
     assign if_inst_ADDRESS_ERROR = inst_addr[1:0] != 2'b00;
 
     reg exc_oc_invalid; // * 异常发生后紧接着取出的指令不是正确指令
-    always @(posedge aclk) exc_oc_invalid <= !aresetn ? 1'b0 : ex_exc_oc;
-
-    wire id_bd_tmp;
+    always @(posedge aclk) begin
+        if(!aresetn) exc_oc_invalid <= 1'b0;
+        else exc_oc_invalid <=  ex_exc_oc ? 1'b1 :
+                                exc_oc_invalid ? if_id_stall || if_id_refresh : 1'b0;
+    end
 
     if_id_seg u_if_id_seg(
         .clk    (aclk),
@@ -255,10 +274,12 @@ module cpu_core(
         .id_branch      (id_branch),
         .if_addr_error  (if_inst_ADDRESS_ERROR),
         .if_pc          (inst_addr),
+        // .if_inst        (inst_rdata),
 
         .id_bd          (id_bd),
         .id_addr_error  (id_addr_error),
         .id_pc          (id_pc)
+        // .id_inst        (last_inst)
     );
 
     // *ID
@@ -268,14 +289,14 @@ module cpu_core(
                             id_immXtype == 2'b01 ? {{16{id_inst[15]}}, `GET_Imm(id_inst)} : // signed extend
                             {`GET_Imm(id_inst), 16'b0};                                     // {imm, {16{0}}}
     
-    assign id_inst  = exc_oc_invalid ? 32'b0 : inst_rdata;
+    assign id_inst  = exc_oc_invalid ? 32'b0 : /*if_id_stall ? last_inst :*/ inst_rdata;
 
     regfile u_regfile(
         .clk    (aclk),
         .resetn (aresetn),
         .rs     (id_rs),
         .rt     (id_rt),
-        .wen    (wb_regwen),
+        .wen    (wb_regwen && !ex_wb_stall), // * wb被暂停不写
         .wreg   (wb_wreg),
         .wdata  (inRegData),
 
@@ -480,11 +501,11 @@ module cpu_core(
 
     // *data_sram and cp0
     assign data_req = ex_data_en && !ex_data_ADDRESS_ERROR;
-    assign data_addr = ex_res & 32'h1fff_ffff;
+    assign data_addr = ex_res & 32'h1fff_fffc;
     assign data_wr = |ex_data_wen;
     assign data_size = ex_lsV[3] ? 2'b10 : ex_lsV[1] ? 2'b01 : 2'b00;
-    assign ex_data_ADDRESS_ERROR = ex_data_en && (ex_load && (ex_data_ren == 4'b0011 && data_addr[0] || ex_data_ren == 4'b1111 && data_addr[1:0] != 2'b00)
-                                    || !ex_load && (ex_data_wen == 4'b0011 && data_addr[0] || ex_data_wen == 4'b1111 && data_addr[1:0] != 2'b00));
+    assign ex_data_ADDRESS_ERROR = ex_data_en && (ex_load && (ex_data_ren == 4'b0011 && ex_res[0] || ex_data_ren == 4'b1111 && ex_res[1:0] != 2'b00)
+                                    || !ex_load && (ex_data_wen == 4'b0011 && ex_res[0] || ex_data_wen == 4'b1111 && ex_res[1:0] != 2'b00));
     wire ex_data_req = data_req;
 
     wire [`EXBITS] EX_ex = {ex_addr_error, ex_ex} | {2'b0, ex_IntegerOverflow, 2'b0, ex_data_ADDRESS_ERROR};
@@ -503,17 +524,17 @@ module cpu_core(
     wire [31:0] cp0_status, cp0_cause;  // * cp0cause not use for now
     wire exc_valid = cp0_status[`Status_EXL] ? !wb_eret : // * valid 1 : 表示有例外在处理, 刚传到ex段的例外也算属于在处理
                     ext_int_response ? 1'b1 : |EX_ex;
-    wire [31:0] cp0_wdata = wb_regwen && ex_rt == wb_wreg ? wb_reorder_data : ex_wdata;
+    wire [31:0] cp0_wdata = ex_wdata;
 
     // * 重定向一致 cp0_wdata, data_wdata
     assign data_wdata = {   {8{ex_lsV[3]}} & cp0_wdata[31:24],
                             {8{ex_lsV[2]}} & cp0_wdata[23:16],
                             {8{ex_lsV[1]}} & cp0_wdata[15: 8],
-                            {8{ex_lsV[0]}} & cp0_wdata[7 : 0]}; // << {data_addr[1:0], 3'b0};
-    assign data_wstrb = ex_data_wen << data_addr[1:0];
+                            {8{ex_lsV[0]}} & cp0_wdata[7 : 0]} << {ex_res[1:0], 3'b0};
+    assign data_wstrb = ex_data_wen << ex_res[1:0];
 
     assign ex_exc_oc = !cp0_status[`Status_EXL] && exc_valid;
-    wire [31:0] exc_badvaddr = EX_ex[5] ? ex_pc : ex_res;
+    wire [31:0] exc_badvaddr = EX_ex[5] ? ex_pc : ex_res; // FIXME: ex_pc可能需要修改，取地址错误的地址不一定是ex_pc
     // * CP0 regs
     cp0 u_cp0(
         .clk    (aclk),
@@ -545,6 +566,9 @@ module cpu_core(
 
         .stall  (ex_wb_stall),
         .refresh(ex_wb_refresh),
+        // .last_refresh   (wb_last_refresh),
+
+        .hit_when_refill_i  (hit_when_refill_i),
 
         .ex_pc          (ex_pc),
         .ex_inst        (ex_inst),
@@ -552,7 +576,7 @@ module cpu_core(
         .ex_load        (ex_load),
         .ex_loadX       (ex_loadX),
         .ex_lsV         (ex_lsV),
-        .ex_data_addr   (data_addr[1:0]),
+        .ex_data_addr   (ex_res[1:0]),
         .ex_al          (ex_al),
         .ex_regwen      (ex_regwen),
         .ex_wreg        (ex_wreg),
@@ -562,6 +586,8 @@ module cpu_core(
         .ex_cp0rdata    (ex_cp0rdata),
         .ex_hiloren     (ex_hiloren),
         .ex_hilordata   (ex_hilordata),
+
+        .wb_hit_when_refill (wb_hit_when_refill),
 
         .wb_pc          (wb_pc),
         .wb_inst        (wb_inst),
@@ -581,7 +607,7 @@ module cpu_core(
         .wb_hilordata   (wb_hilordata)
     );
 
-    wire [31:0] wb_data_rdata = data_rdata; // >> {wb_data_addr, 3'b0};
+    wire [31:0] wb_data_rdata = /*wb_hit_when_refill ? hit_when_refill_word_i : */data_rdata >> {wb_data_addr, 3'b0};
 
     assign wb_rdata[7 : 0] =    {8{wb_lsV[0]}} & wb_data_rdata[7:0];
     assign wb_rdata[15: 8] =    {8{wb_lsV[1]}} & wb_data_rdata[15:8] |
@@ -591,15 +617,11 @@ module cpu_core(
                                 {16{!wb_lsV[2] && !wb_lsV[3] && !wb_lsV[1] && wb_lsV[0] && wb_loadX && wb_data_rdata[7]}};
 
     // *WB
-    assign inRegData =  {32{wb_al}      } & (wb_pc + 32'd8) |   // *al: pc+8 -> GPR[31]
-                        {32{wb_load}    } & wb_rdata        |   // *load: data from data sram -> GPR[rt]
-                        {32{wb_cp0ren}  } & wb_cp0rdata     |   // *MFC0: data from CP0 -> GPR[rt]
-                        {32{|wb_hiloren}} & wb_hilordata    |   // *MFHI/LO: data from HI/LO -> GPR[rd]
-                        {32{!wb_al && !wb_load && !wb_cp0ren && !(|wb_hiloren)}} & wb_res; // *SPEC: data from ALU -> GPR[rd]
+    assign inRegData = wb_reorder_data;
 
     // *debug
     assign debug_wb_pc          = wb_pc;
-    assign debug_wb_rf_wen      = {4{wb_regwen}};
+    assign debug_wb_rf_wen      = {4{wb_regwen && !ex_wb_stall}};
     assign debug_wb_rf_wnum     = wb_wreg;
     assign debug_wb_rf_wdata    = inRegData;
 
