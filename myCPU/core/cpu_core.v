@@ -180,7 +180,7 @@ module cpu_core(
 
         .inst_req       (inst_req),
         .inst_addr_ok   (inst_addr_ok),
-        .inst_data_ok   (inst_data_ok || if_inst_ADDRESS_ERROR || id_addr_error),
+        .inst_data_ok   (inst_data_ok || (if_inst_ADDRESS_ERROR && !id_bd) || id_addr_error),
 
         .data_req_pre   (wb_data_req && wb_load),   // * 取数请求
         .data_req       (data_req || (data_cache_state && ex_data_en && !ext_int_response && !ex_data_ADDRESS_ERROR)), // * data_cache_state == 1 -> busy
@@ -361,7 +361,7 @@ module cpu_core(
         .id_addr_error(id_addr_error/* || id_branch_target_address_error*/),
         .id_ex      (id_ex),
         .id_pc      (id_pc),
-        .id_inst    (inst_rdata), // * avoid timing loop
+        .id_inst    (id_inst), // * avoid timing loop
         .id_imm     (id_imm),
         .id_Imm     (id_Imm),
         .id_A       (regouta),
