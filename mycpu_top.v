@@ -505,8 +505,6 @@ module mycpu_top(
         .inst_addr_ok(cpu_inst_addr_ok & inst_stall),
         .inst_data_ok(cpu_inst_data_ok),
 
-        // .hit_when_refill_i      (hit_when_refill_o),
-        // .hit_when_refill_word_i (hit_when_refill_word_o),
 
         .data_req    (cpu_data_req  ),
         .data_wr     (cpu_data_wr   ),
@@ -599,7 +597,7 @@ module mycpu_top(
         .cache_op_ok(data_cache_op_ok),
         .cache_tag  (32'b0),
 
-        .data_req     (data_req     ),
+        .data_req     (data_req    ),
         .data_wr      (data_wr     ),
         .data_size    (data_size   ),
         .data_addr    (data_addr   ),
@@ -608,9 +606,6 @@ module mycpu_top(
         .data_rdata   (data_rdata  ),
         .data_addr_ok (data_addr_ok),
         .data_data_ok (data_data_ok),
-
-        // .hit_when_refill_o      (hit_when_refill_o),
-        // .hit_when_refill_word_o (hit_when_refill_word_o),
 
         .arid         (data_cache_arid   ),
         .araddr       (data_cache_araddr ),

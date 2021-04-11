@@ -40,12 +40,6 @@ module cpu_core(
     output  [31:0]  debug_wb_rf_wdata
 );
 
-    assign inst_cache = 1'b1; // * TLB相关，后续需要修改
-    assign data_cache = 1'b1;
-    assign cache_req = 1'b0;
-    assign cache_op = 7'b0;
-    assign cache_tag = 32'b0;
-
     // *Exceptions
     // TODO: TLB exceptions refill, invalid, modified
     wire    if_inst_ADDRESS_ERROR;
@@ -160,14 +154,15 @@ module cpu_core(
     wire    wb_last_refresh;
 
     wire    div_stall;
-    
-    // reg last_if_stall;
-    // always @(posedge aclk) begin
-    //     if(!aresetn) last_if_stall <= 1'b0;
-    //     else last_if_stall <= if_id_stall;
-    // end
+
+    assign inst_cache = 1'b1; // * TLB相关，后续需要修改
+    assign data_cache = !(ex_res[31:29] == 3'b101);
+    assign cache_req = 1'b0;
+    assign cache_op = 7'b0;
+    assign cache_tag = 32'b0;
 
     reg inst_cache_state;
+    reg data_cache_state;
     parameter IDLE          =   1'b0;
     parameter BUSY          =   1'b1;
     always @(posedge aclk)
@@ -175,18 +170,20 @@ module cpu_core(
                                 inst_addr_ok    ? BUSY :
                                 inst_data_ok    ? IDLE :
                                 inst_cache_state       ;
-
-    assign inst_req = (!inst_cache_state || inst_data_ok)/* && !last_if_stall*/; // * !inst_cache_state || inst_data_ok;
+    
+    wire ext_int_response; // TODO:
+    wire id_branch_target_address_error;  // * jump到的地址不对齐，取指异常
+    assign inst_req = (!inst_cache_state || inst_data_ok) && !if_inst_ADDRESS_ERROR && !ext_int_response /*&& !id_branch_target_address_error*/;
 
     cu u_cu(
         .id_pc      (id_pc),
 
         .inst_req       (inst_req),
         .inst_addr_ok   (inst_addr_ok),
-        .inst_data_ok   (inst_data_ok),
+        .inst_data_ok   (inst_data_ok || if_inst_ADDRESS_ERROR || id_addr_error),
 
         .data_req_pre   (wb_data_req && wb_load),   // * 取数请求
-        .data_req       (data_req),
+        .data_req       (data_req || (data_cache_state && ex_data_en && !ext_int_response && !ex_data_ADDRESS_ERROR)), // * data_cache_state == 1 -> busy
         .data_addr_ok   (data_addr_ok),
         .data_data_ok   (data_data_ok),
         .data_wr        (data_wr),
@@ -199,7 +196,7 @@ module cpu_core(
         .ex_rt      (ex_rt),
 
         .exc_oc     (ex_exc_oc),
-        .eret       (id_eret),
+        .eret       (ex_eret),
 
         .id_branch  (id_branch),
         .id_rs_ren  (id_rs_ren),
@@ -223,7 +220,7 @@ module cpu_core(
         .id_ex_refresh  (id_ex_refresh),
         .ex_wb_refresh  (ex_wb_refresh)
         // .ex_wb_write_disable    (ex_wb_write_disable)
-);
+    );
 
     // * 重定向数据
     wire [31:0] ex_reorder_data =   {32{|ex_hiloren}} & ex_hilordata    |   //* ex段读HI/LO写ex段的rs
@@ -254,7 +251,6 @@ module cpu_core(
     );
 
     assign inst_addr = !pre_ins ? npc : npc-32'd4;
-    // assign inst_addr = npc-32'd4;
     assign if_inst_ADDRESS_ERROR = inst_addr[1:0] != 2'b00;
 
     reg exc_oc_invalid; // * 异常发生后紧接着取出的指令不是正确指令
@@ -289,7 +285,7 @@ module cpu_core(
                             id_immXtype == 2'b01 ? {{16{id_inst[15]}}, `GET_Imm(id_inst)} : // signed extend
                             {`GET_Imm(id_inst), 16'b0};                                     // {imm, {16{0}}}
     
-    assign id_inst  = exc_oc_invalid ? 32'b0 : /*if_id_stall ? last_inst :*/ inst_rdata;
+    assign id_inst  = exc_oc_invalid || !inst_data_ok ? 32'b0 : inst_rdata; // * exc_oc 后一条以及 inst_data_ok低时都是无效指令
 
     regfile u_regfile(
         .clk    (aclk),
@@ -353,6 +349,7 @@ module cpu_core(
     );
 
     wire [`NUM_EX_1-1:0] id_ex = {id_ReservedIns, 1'b0, id_BreakEx, id_SyscallEx, 1'b0};
+    assign id_branch_target_address_error = id_branch && id_jump && id_target[1:0] != 2'b00;
 
     id_ex_seg u_id_ex_seg(
         .clk    (aclk),
@@ -361,7 +358,7 @@ module cpu_core(
         .stall  (id_ex_stall),
         .refresh(id_ex_refresh),
 
-        .id_addr_error(id_addr_error),
+        .id_addr_error(id_addr_error/* || id_branch_target_address_error*/),
         .id_ex      (id_ex),
         .id_pc      (id_pc),
         .id_inst    (inst_rdata), // * avoid timing loop
@@ -499,8 +496,14 @@ module cpu_core(
     // *store命令写入的数据, mtc0命令的写入数据
     assign ex_wdata = wb_wreg == ex_rt && wb_regwen ? wb_reorder_data : ex_B;
 
+    always @(posedge aclk)
+        data_cache_state    <=  !aresetn        ? IDLE :
+                                data_addr_ok    ? BUSY :
+                                data_data_ok    ? IDLE :
+                                data_cache_state       ;
+
     // *data_sram and cp0
-    assign data_req = ex_data_en && !ex_data_ADDRESS_ERROR;
+    assign data_req = (!data_cache_state || data_data_ok) && ex_data_en && !ext_int_response && !ex_data_ADDRESS_ERROR;
     assign data_addr = ex_res & 32'h1fff_fffc;
     assign data_wr = |ex_data_wen;
     assign data_size = ex_lsV[3] ? 2'b10 : ex_lsV[1] ? 2'b01 : 2'b00;
@@ -518,9 +521,8 @@ module cpu_core(
                             EX_ex[0] ? 
                                 ex_load ? `EXC_AdEL : `EXC_AdES
                             : 5'b0;
-
-    wire ext_int_response;
-    wire [31:0] exc_epc = ex_bd ? ex_pc-32'd4 : ex_pc;
+    wire ext_int_soft;
+    wire [31:0] exc_epc = ex_bd/* || ext_int_soft*/ ? ex_pc-32'd4 : ex_pc;
     wire [31:0] cp0_status, cp0_cause;  // * cp0cause not use for now
     wire exc_valid = cp0_status[`Status_EXL] ? !wb_eret : // * valid 1 : 表示有例外在处理, 刚传到ex段的例外也算属于在处理
                     ext_int_response ? 1'b1 : |EX_ex;
@@ -542,6 +544,7 @@ module cpu_core(
 
         .ext_int            (ext_int),
         .ext_int_response   (ext_int_response),
+        // .ext_int_soft       (ext_int_soft),
 
         .wen    (ex_cp0wen),
         .addr   (ex_cp0addr),
@@ -566,7 +569,6 @@ module cpu_core(
 
         .stall  (ex_wb_stall),
         .refresh(ex_wb_refresh),
-        // .last_refresh   (wb_last_refresh),
 
         .hit_when_refill_i  (hit_when_refill_i),
 
@@ -607,7 +609,7 @@ module cpu_core(
         .wb_hilordata   (wb_hilordata)
     );
 
-    wire [31:0] wb_data_rdata = /*wb_hit_when_refill ? hit_when_refill_word_i : */data_rdata >> {wb_data_addr, 3'b0};
+    wire [31:0] wb_data_rdata = data_rdata >> {wb_data_addr, 3'b0};
 
     assign wb_rdata[7 : 0] =    {8{wb_lsV[0]}} & wb_data_rdata[7:0];
     assign wb_rdata[15: 8] =    {8{wb_lsV[1]}} & wb_data_rdata[15:8] |
