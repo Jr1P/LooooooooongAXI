@@ -7,3 +7,4 @@ CONFREG/*
 axi_cache_bridge*
 data_cache_data_ram*
 inst_cache_data_ram*
+copy*

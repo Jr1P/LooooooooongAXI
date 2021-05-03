@@ -1241,8 +1241,8 @@ module data_cache(
                                         RUN;
                 WAIT_MISS: state <= (victim_idle)?MISS:WAIT_MISS;
                 MISS:    state <= (arready & data_ready)? WAIT_FOR_AXI:MISS;
-                WAIT_FOR_AXI: state <= (rvalid & data_back)?(rlast ? FINISH : REFILL):WAIT_FOR_AXI;
-                // WAIT_FOR_AXI: state <= (rvalid & data_back)?REFILL:WAIT_FOR_AXI;
+                // WAIT_FOR_AXI: state <= (rvalid & data_back)?(rlast ? FINISH : REFILL):WAIT_FOR_AXI;
+                WAIT_FOR_AXI: state <= (rvalid & data_back)?REFILL:WAIT_FOR_AXI;
                 WAIT_FOR_PRE_AXI: state <= (pre_get_write_line | pre_write_back | pre_run)?WAIT_FOR_PRE_REFILL:WAIT_FOR_PRE_AXI;
                 REFILL:  state <= (rlast & rvalid & data_back)?FINISH:REFILL;
                 WAIT_FOR_PRE_REFILL: state <= (pre_write_back | pre_run)?IDLE:WAIT_FOR_PRE_REFILL;

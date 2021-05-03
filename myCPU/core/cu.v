@@ -14,6 +14,8 @@ module cu(
     input       data_data_ok,
     input       data_wr,
 
+    input       ext_int_soft,
+
     input       ex_rs_ren,
     input [4:0] ex_rs,
     input       ex_rt_ren,
@@ -63,7 +65,7 @@ module cu(
     assign if_id_stall = ex_branch_stall || inst_stall || (id_ex_stall && id_pc);
 
     assign if_id_refresh = exc_oc/* || eret*/;
-    assign id_ex_refresh = !id_ex_stall && (eret || exc_oc || ex_branch_stall || if_id_stall);
+    assign id_ex_refresh = !id_ex_stall && !ext_int_soft && (eret || exc_oc || ex_branch_stall || if_id_stall);
     assign ex_wb_refresh = !ex_wb_stall && (exc_oc || div_stall || (data_stall && load_load));
 
 endmodule

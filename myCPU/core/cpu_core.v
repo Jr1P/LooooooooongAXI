@@ -172,9 +172,10 @@ module cpu_core(
                                 inst_cache_state       ;
     
     wire ext_int_response; // TODO:
+    wire ext_int_soft;
     wire id_branch_target_address_error;  // * jump到的地址不对齐，取指异常
     assign inst_req = (!inst_cache_state || inst_data_ok) && !if_inst_ADDRESS_ERROR && !ext_int_response /*&& !id_branch_target_address_error*/;
-
+    wire inst_stall;
     cu u_cu(
         .id_pc      (id_pc),
 
@@ -188,7 +189,7 @@ module cpu_core(
         .data_data_ok   (data_data_ok),
         .data_wr        (data_wr),
 
-        // .wb_hit_when_refill (hit_when_refill_i),
+        .ext_int_soft   (ext_int_soft),
 
         .ex_rs_ren  (ex_rs_ren),
         .ex_rs      (ex_rs),
@@ -503,7 +504,6 @@ module cpu_core(
                                 data_cache_state       ;
 
     // *data_sram and cp0
-    assign data_req = (!data_cache_state || data_data_ok) && ex_data_en && !ext_int_response && !ex_data_ADDRESS_ERROR;
     assign data_addr = ex_res & 32'h1fff_fffc;
     assign data_wr = |ex_data_wen;
     assign data_size = ex_lsV[3] ? 2'b10 : ex_lsV[1] ? 2'b01 : 2'b00;
@@ -512,6 +512,7 @@ module cpu_core(
     wire ex_data_req = data_req;
 
     wire [`EXBITS] EX_ex = {ex_addr_error, ex_ex} | {2'b0, ex_IntegerOverflow, 2'b0, ex_data_ADDRESS_ERROR};
+    assign data_req = (!data_cache_state || data_data_ok) && ex_data_en && !ext_int_response && !(|EX_ex);
     wire [4:0] exc_excode = ext_int ? `EXC_INT :
                             EX_ex[5] ? `EXC_AdEL : // *取指地址错
                             EX_ex[4] ? `EXC_RI :   // *RI
@@ -521,7 +522,6 @@ module cpu_core(
                             EX_ex[0] ? 
                                 ex_load ? `EXC_AdEL : `EXC_AdES
                             : 5'b0;
-    wire ext_int_soft;
     wire [31:0] exc_epc = ex_bd/* || ext_int_soft*/ ? ex_pc-32'd4 : ex_pc;
     wire [31:0] cp0_status, cp0_cause;  // * cp0cause not use for now
     wire exc_valid = cp0_status[`Status_EXL] ? !wb_eret : // * valid 1 : 表示有例外在处理, 刚传到ex段的例外也算属于在处理
@@ -544,7 +544,7 @@ module cpu_core(
 
         .ext_int            (ext_int),
         .ext_int_response   (ext_int_response),
-        // .ext_int_soft       (ext_int_soft),
+        .ext_int_soft       (ext_int_soft), // * 指示本条指令是否写ip_software且会在下一个周期产生软件中断
 
         .wen    (ex_cp0wen),
         .addr   (ex_cp0addr),

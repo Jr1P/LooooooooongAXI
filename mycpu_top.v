@@ -274,7 +274,7 @@ module mycpu_top(
     wire        cpu_data_wr;
     wire [3:0]  cpu_data_wstrb;
     wire [31:0] cpu_data_addr;
-    wire [2 :0] cpu_data_size;
+    wire [1 :0] cpu_data_size;
     wire [31:0] cpu_data_wdata;
     wire [31:0] cpu_data_rdata;
     wire        cpu_data_addr_ok;

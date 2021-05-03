@@ -8,7 +8,7 @@ module cp0 (
     // * interrput
     input  [5 :0]   ext_int,
     output          ext_int_response,   // *中断响应
-    // output          ext_int_soft,       // *软件中断
+    output          ext_int_soft,       // *软件中断
 
     input           wen,    // *write engine
     input  [7 :0]   addr,   // *write/read address
@@ -36,13 +36,13 @@ module cp0 (
                     | exc_excode == `EXC_AdES;
 
     // *Index (4, 0) | read and partially writeable
-    reg Index_P;
-    reg [`Index_IndexBITs] Index_Index;
-    assign index = {Index_P, 31'b0} | Index_Index;
-    wire index_wen = wen && addr == `CP0_Index;
-    always @(posedge clk) begin
+    // reg Index_P;
+    // reg [`Index_IndexBITs] Index_Index;
+    // assign index = {Index_P, 31'b0} | Index_Index;
+    // wire index_wen = wen && addr == `CP0_Index;
+    // always @(posedge clk) begin
         // TODO: INDEX
-    end
+    // end
 
     // *BadVAddr (8, 0) | read only | reset val: null
     reg [31:0] badvaddr;
@@ -129,7 +129,7 @@ module cp0 (
     end
     // *                            存在未被屏蔽的中断                 没有例外在处理   中断使能开启
     assign ext_int_response = ({hardware_int, ip_software} & Status_IM) && !Status_EXL && Status_IE;
-    assign ext_int_soft = ext_int_response & (|ip_software);
+    assign ext_int_soft = cause_wen & (|wdata[`Cause_IP_SOFTWARE]);
 
     // * Config0 (16, 0) | read and partially writeable |
     wire config0_wen = wen && addr == `CP0_Config0;
@@ -163,7 +163,7 @@ module cp0 (
     };
 
     assign rdata = 
-            {32{addr == `CP0_Index      }} & index      |
+            // {32{addr == `CP0_Index      }} & index      |
             {32{addr == `CP0_BadVAddr   }} & badvaddr   |
             {32{addr == `CP0_Count      }} & count      |
             {32{addr == `CP0_Compare    }} & compare    |
