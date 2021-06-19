@@ -1,16 +1,46 @@
 `timescale 1ns/1ps
 
 // * normal mul
-// TODO: 太拉了，改华莱士树
+`define PIPELINE_DEPTH 3
 module mul(
-    input [31:0]    A,
-    input [31:0]    B,
+    input   clk,
+    input   resetn,
+    input   en,
+    input   cancel,
 
-    output [63:0] res,
-    output signed [63:0] signedres
+    input [32:0]    A,
+    input [32:0]    B,
+
+    output [65:0]   res,
+    output          working,
+    output          finish
 );
 
-    assign res = A * B;
-    assign signedres = $signed(A) * $signed(B);
+    reg [2:0] cnt;
+    always @(posedge clk) begin
+        if(!resetn || finish)   cnt <= 3'd0;
+        else if(cancel)         cnt <= 3'd1;
+        else if(en || working)  cnt <= cnt + 3'd1;
+    end
+
+    reg reg_en;
+    always @(posedge clk) begin
+        if(!resetn) reg_en <= 1'b0;
+        else if(!reg_en) reg_en <= en;
+        else if(!en && finish) reg_en <= 1'b0;
+    end
+
+    mult_gen_1 mul1(
+        .CLK    (clk),
+        .CE     (en || reg_en),
+
+        .A      (A),
+        .B      (B),
+
+        .P      (res)
+    );
+
+    assign working = cnt && !finish;
+    assign finish = cnt == `PIPELINE_DEPTH;
 
 endmodule

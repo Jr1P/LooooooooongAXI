@@ -153,7 +153,7 @@ module cpu_core(
     wire    ex_wb_write_disable;
     wire    wb_last_refresh;
 
-    wire    div_stall;
+    wire    div_mul_stall;
 
     assign inst_cache = 1'b1; // * TLB相关，后续需要修改
     assign data_cache = !(ex_res[31:29] == 3'b101);
@@ -211,7 +211,7 @@ module cpu_core(
         .ex_wreg    (ex_wreg),
 
         .pre_ins    (pre_ins),
-        .div_stall  (div_stall),
+        .div_mul_stall  (div_mul_stall),
 
         .if_id_stall    (if_id_stall),
         .id_ex_stall    (id_ex_stall),
@@ -440,19 +440,28 @@ module cpu_core(
         .res                (ex_res)
     );
 
-    wire [63:0] mul_res, mul_signed_res;
+    wire [65:0] mul_res;
+    wire mul_working, mul_finish;
+    wire mul_cancel = mul_working && ex_mult;
+
     mul u_mul(
-        .A      (inAlu1),
-        .B      (inAlu2),
+        .clk    (aclk),
+        .resetn (aresetn),
+        .en     (ex_mult),
+        .cancel (mul_cancel),
+
+        .A      ({ex_mdsign & inAlu1[31], inAlu1}),
+        .B      ({ex_mdsign & inAlu2[31], inAlu2}),
 
         .res        (mul_res),
-        .signedres  (mul_signed_res)
+        .working    (mul_working),
+        .finish     (mul_finish)
     );
 
     wire [31:0] quot, remainder;
     wire div_working, div_finish;
     wire div_cancel = div_working && ex_div;
-    assign div_stall = ((|ex_hiloren) || (|ex_hilowen)) && div_working;
+    assign div_mul_stall = ((|ex_hiloren) || (|ex_hilowen)) && (div_working || mul_working);
     div u_div(
         .clk    (aclk),
         .resetn (aresetn),
@@ -472,16 +481,13 @@ module cpu_core(
 
     // * write HI LO
     wire [31:0] hiwdata =   ex_hilowen == 2'b10 ? inAlu1 : // *GPR[rs] -> HI
-                            ex_mult ?
-                                {32{!ex_mdsign} } & mul_res[63:32] |
-                                {32{ex_mdsign}  } & mul_signed_res[63:32] :
-                            remainder;
+                            mul_finish ? mul_res[63:32] :
+                            div_finish ? remainder : 32'b0;
     wire [31:0] lowdata =   ex_hilowen == 2'b01 ? inAlu1 : // *GPR[rs] -> LO
-                            ex_mult ?
-                                {32{!ex_mdsign} } & mul_res[31:0] |
-                                {32{ex_mdsign}  } & mul_signed_res[31:0] :
-                            quot;
-    wire [1:0] hilowen = ex_div || div_working ? 2'b0 : div_finish ? 2'b11 : ex_hilowen;
+                            mul_finish ? mul_res[31:0] :
+                            div_finish ? quot : 32'b0;
+    wire [1:0] hilowen  =   ex_div || ex_mult || div_working || mul_working ? 2'b0 :
+                            div_finish || mul_finish ? 2'b11 : ex_hilowen;
     hilo u_hilo(
         .clk    (aclk),
         .resetn (aresetn),

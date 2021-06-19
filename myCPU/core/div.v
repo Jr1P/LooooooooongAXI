@@ -28,8 +28,9 @@ module div(
     wire [64:0] sub3 = x - y3;
 
     always @(posedge clk) begin
-        if(!resetn || finish || cancel) cnt <= 5'd0;
-        else if(en || working) cnt <= cnt+5'd1;
+        if(!resetn || finish)   cnt <= 5'd0;
+        else if(cancel)         cnt <= 5'd1;
+        else if(en || working)  cnt <= cnt+5'd1;
     end
 
     always @(posedge clk) begin
