@@ -19,6 +19,7 @@ endmodule
 
 // * instruction decode
 module id(
+    input           id_addr_error,
 
     input   [31:0]  id_inst,    // used in Branch and J ins
     input   [31:0]  id_pc,
@@ -37,7 +38,8 @@ module id(
     output          loadX,          // valid when load is 1, 1: signed extend data loaded from data mem, 0: zero extend
     output  [3 :0]  lsV,            // load store vaild, lsV[i] = 1 means the i-th Byte from data mem(or into data mem) is valid
     output          imm,            // 1: with immediate, 0: not
-    output  [1 :0]  immXtype,       // valid when imm is 1. 0: zero extend
+    output  [31:0]  Imm,            // number of Immediate
+    // output  [1 :0]  immXtype,       // valid when imm is 1. 0: zero extend
                                         // 1: signed extend, 2: {imm, {16{0}}}
     output          regwen,         // write en on GPRs, 1: write GPR[wreg], 0: not write
     output  [4 :0]  wreg,           // vaild when regwen is 1
@@ -58,10 +60,8 @@ module id(
 
     output  [5 :0]  func,           // valid when SPEC is 0, use for I type
     // * 例外
-    output  eret,           // eret instruction
-    output  ReservedIns,    // ReservedInstruction Ex 
-    output  BreakEx,        // Break point Ex
-    output  SyscallEx       // System call Ex
+    output              eret,   // eret instruction
+    output  [`EXBITS]   id_ex   // Ex
 );
     // TODO: TLB instructions and cache instructions
 
@@ -170,8 +170,6 @@ module id(
     wire op_sw      = op_d[43];
     wire op_cache   = op_d[47];
 
-    assign ReservedIns  = ~|{`DECODED_OPS};
-
     // * 跳转相关
     assign branch   =   (opcode >= `J && opcode <= `BGTZ) || op_jalr || op_jr || op_bltz || op_bgez || op_bltzal || op_bgezal;
 
@@ -207,9 +205,13 @@ module id(
 
     assign imm      =   (opcode >= `ADDI && opcode <= `LUI) || data_en;
 
-    assign immXtype =   op_lui ? 2'b11:                                 // {imm, 16{0}}
+    wire[1:0] Xtype =   op_lui ? 2'b11:                                 // {imm, 16{0}}
                         opcode >= `ANDI && opcode <= `XORI ? 2'b00 :    // zero extend
                         2'b01;                                          // signed ex
+
+    assign Imm      =   Xtype == 2'b00 ? {16'b0, `GET_Imm(id_inst)}           :   // zero extend
+                        Xtype == 2'b01 ? {{16{id_inst[15]}}, `GET_Imm(id_inst)} : // signed extend
+                        {`GET_Imm(id_inst), 16'b0};
 
     assign regwen   =   !(|hilowen) && (al || (imm && !(|data_wen)) || SPEC || op_mfc0);
 
@@ -240,7 +242,9 @@ module id(
 
     // * ex
     assign eret         = op_eret;
-    assign BreakEx      = op_break;
-    assign SyscallEx    = op_syscall;
+    wire    ReservedIns  = ~|{`DECODED_OPS};// ReservedInstruction Ex 
+    wire    BreakEx      = op_break;        // Break point Ex
+    wire    SyscallEx    = op_syscall;      // System call Ex
+    assign  id_ex        = {id_addr_error, ReservedIns, 1'b0, BreakEx, SyscallEx, 1'b0};
 
 endmodule

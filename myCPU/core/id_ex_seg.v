@@ -4,13 +4,11 @@
 module id_ex_seg (
     input   clk,
     input   resetn,
-    // input   recode,
 
     input   stall,
     input   refresh,
 
-    input id_addr_error,    
-    input [`NUM_EX_1-1:0] id_ex,
+    input [`EXBITS] id_ex,
 
     input [31:0]    id_pc,
     input [31:0]    id_inst,
@@ -42,8 +40,7 @@ module id_ex_seg (
     input [1 :0]    id_hiloren,
     input [1 :0]    id_hilowen,
 
-    output reg ex_addr_error,
-    output reg [`NUM_EX_1-1:0]ex_ex,
+    output reg [`EXBITS]ex_ex,
     
     output reg [31:0]   ex_pc,
     output reg [31:0]   ex_inst,
@@ -81,19 +78,17 @@ module id_ex_seg (
             ex_pc           <= 32'h0;
             ex_inst         <= 32'h0;
             ex_bd           <= 1'b0;
-            ex_addr_error   <= 1'b0;
         end
         else if(!stall) begin
             ex_pc           <= id_pc;
             ex_inst         <= id_inst;
             ex_bd           <= id_bd;
-            ex_addr_error   <= id_addr_error;
         end
     end
 
     always @(posedge clk) begin
         if(!resetn || refresh) begin
-            ex_ex       <= `NUM_EX_1'b0;
+            ex_ex       <= `NUM_EX'b0;
             ex_imm      <= 1'b0;
             ex_Imm      <= 32'h0;
             ex_A        <= 32'h0;

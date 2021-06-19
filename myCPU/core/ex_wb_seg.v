@@ -6,10 +6,6 @@ module ex_wb_seg (
 
     input   stall,
     input   refresh,
-    // input   write_disable,
-    // output reg last_refresh,
-
-    input hit_when_refill_i,
 
     input [31:0]    ex_pc,
     input [31:0]    ex_inst,
@@ -32,8 +28,6 @@ module ex_wb_seg (
     input [1 :0]    ex_hiloren,
     input [31:0]    ex_hilordata,
 
-    output reg          wb_hit_when_refill,
-
     output reg [31:0]   wb_pc,
     output reg [31:0]   wb_inst,
     output reg [31:0]   wb_res,
@@ -55,14 +49,8 @@ module ex_wb_seg (
     output reg [31:0]   wb_hilordata
 );
 
-    // always @(posedge clk) begin
-    //     if(!resetn) last_refresh <= 1'b0;
-    //     else last_refresh <= refresh;
-    // end
-
     always @(posedge clk) begin
         if(!resetn || refresh) begin
-            wb_hit_when_refill <= 1'b0;
             wb_pc       <= 32'b0;
             wb_inst     <= 32'b0;
             wb_res      <= 32'b0;
@@ -80,12 +68,7 @@ module ex_wb_seg (
             wb_hiloren  <= 2'b0;
             wb_hilordata<= 32'b0;
         end
-        // else if(refresh) begin
-        //     wb_regwen   <= 1'b0;    // * 只刷掉写使能和hit_when
-        //     wb_hit_when_refill <= 1'b0;
-        // end
         else if(!stall) begin
-            wb_hit_when_refill <= hit_when_refill_i;
             wb_pc       <= ex_pc;
             wb_inst     <= ex_inst;
             wb_res      <= ex_res;
@@ -103,7 +86,6 @@ module ex_wb_seg (
             wb_hiloren  <= ex_hiloren;
             wb_hilordata<= ex_hilordata;
         end
-        // else if(write_disable) wb_regwen <= 1'b0;
     end
 
 endmodule
