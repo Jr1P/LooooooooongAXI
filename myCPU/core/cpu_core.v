@@ -435,7 +435,7 @@ module cpu_core(
     wire [31:0] quot, remainder;
     wire div_working, div_finish;
     wire div_cancel = div_working && ex_div;
-    assign div_mul_stall = ((|ex_hiloren) || (|ex_hilowen)) && (div_working || mul_working);
+    assign div_mul_stall = !ex_exc_oc && ((|ex_hiloren) || (|ex_hilowen)) && (div_working || mul_working);
     div u_div(
         .clk    (aclk),
         .resetn (aresetn),
