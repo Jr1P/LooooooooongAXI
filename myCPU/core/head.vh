@@ -102,6 +102,7 @@
 `define CP0_Config0     8'b10000_000    //* (16, 0)
 `define CP0_Config1     8'b10000_001    //* (16, 1)
 
+`define CP0ADDR     7:0
 `define NUM_EX      6
 `define NUM_EX_1    5
 `define EXBITS      `NUM_EX_1:0

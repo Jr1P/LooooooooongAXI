@@ -42,120 +42,153 @@ module cpu_core(
     wire    if_inst_ADDRESS_ERROR;
     wire    ex_IntegerOverflow;
     wire    ex_data_ADDRESS_ERROR;
+    // * IF
+    wire [31:0]     npc;
     // *ID
     wire [31:0]     regouta, regoutb;
     wire            id_addr_error;
     wire [`EXBITS]  id_ex;
 
-    wire [31:0] id_pc;
-    wire [31:0] id_inst;
-    wire [4 :0] id_rs = `GET_Rs(id_inst);
-    wire [4 :0] id_rt = `GET_Rt(id_inst);
-    wire        id_bd;
-    wire        id_jump;
-    wire        id_branch;
-    wire [31:0] id_target;
-    wire        id_al;
-    wire        id_SPEC;
-    wire        id_rs_ren;
-    wire        id_rt_ren;
-    wire [5 :0] id_ifunc;
-    wire        id_load;
-    wire        id_loadX;
-    wire [3 :0] id_lsV;
-    wire        id_imm;
-    wire [31:0] id_Imm;
-    wire        id_eret;
-    wire        id_data_en;
-    wire [3 :0] id_data_ren;
-    wire [3 :0] id_data_wen;
-    wire        id_regwen;
-    wire [4 :0] id_wreg;
-    wire        id_cp0ren;
-    wire        id_cp0wen;
-    wire [7 :0] id_cp0addr;
-    wire        id_mult;
-    wire        id_div;
-    wire        id_mdsign;
-    wire [1 :0] id_hiloren;
-    wire [1 :0] id_hilowen;
+    wire [31:0]     id_pc;
+    wire [31:0]     id_inst;
+    wire [4 :0]     id_rs = `GET_Rs(id_inst);
+    wire [4 :0]     id_rt = `GET_Rt(id_inst);
+    wire            id_bd;
+    wire            id_jump;
+    wire            id_branch;
+    wire [31:0]     id_target;
+    wire            id_al;
+    wire            id_SPEC;
+    wire            id_rs_ren;
+    wire            id_rt_ren;
+    wire [5 :0]     id_ifunc;
+    wire            id_load;
+    wire            id_loadX;
+    wire [3 :0]     id_lsV;
+    wire            id_imm;
+    wire [31:0]     id_Imm;
+    wire            id_eret;
+    wire            id_data_en;
+    wire [3 :0]     id_data_ren;
+    wire [3 :0]     id_data_wen;
+    wire            id_regwen;
+    wire [4 :0]     id_wreg;
+    wire            id_cp0ren;
+    wire            id_cp0wen;
+    wire [`CP0ADDR] id_cp0addr;
+    wire            id_mult;
+    wire            id_div;
+    wire            id_mdsign;
+    wire [1 :0]     id_hiloren;
+    wire [1 :0]     id_hilowen;
     // *EX
     wire [`EXBITS]  ex_ex;
 
-    wire [31:0] ex_pc;
-    wire [31:0] ex_inst;
-    wire [4 :0] ex_rs = `GET_Rs(ex_inst);
-    wire [4 :0] ex_rt = `GET_Rt(ex_inst);
-    wire [31:0] ex_res;
-    wire        ex_imm;
-    wire [31:0] ex_Imm;
-    wire [31:0] ex_A;
-    wire [31:0] ex_B;
-    wire        ex_rs_ren;
-    wire        ex_rt_ren;
-    wire        ex_al;
-    wire        ex_SPEC;
-    wire        ex_load;
-    wire        ex_loadX;
-    wire [3 :0] ex_lsV;
-    wire        ex_bd;
-    wire [5 :0] ex_ifunc;
-    wire        ex_regwen;
-    wire [4 :0] ex_wreg;
-    wire        ex_data_en;
-    wire [3 :0] ex_data_ren;
-    wire [3 :0] ex_data_wen;
-    wire [31:0] ex_wdata;
-    wire        ex_eret;
-    wire        ex_exc_oc;
-    wire        ex_cp0ren;
-    wire [31:0] ex_cp0rdata;
-    wire        ex_cp0wen;
-    wire [7 :0] ex_cp0addr;
-    wire        ex_mult;
-    wire        ex_div;
-    wire        ex_mdsign;
-    wire [1 :0] ex_hilowen;
-    wire [1 :0] ex_hiloren;
-    wire [31:0] ex_hilordata;
+    wire [31:0]     ex_pc;
+    wire [31:0]     ex_inst;
+    wire [4 :0]     ex_rs = `GET_Rs(ex_inst);
+    wire [4 :0]     ex_rt = `GET_Rt(ex_inst);
+    wire [31:0]     ex_res;
+    wire            ex_imm;
+    wire [31:0]     ex_Imm;
+    wire [31:0]     ex_A;
+    wire [31:0]     ex_B;
+    wire            ex_rs_ren;
+    wire            ex_rt_ren;
+    wire            ex_al;
+    wire            ex_SPEC;
+    wire            ex_load;
+    wire            ex_loadX;
+    wire [3 :0]     ex_lsV;
+    wire            ex_bd;
+    wire [5 :0]     ex_ifunc;
+    wire            ex_regwen;
+    wire [4 :0]     ex_wreg;
+    wire            ex_data_en;
+    wire [3 :0]     ex_data_ren;
+    wire [3 :0]     ex_data_wen;
+    wire [31:0]     ex_wdata;
+    wire            ex_eret;
+    wire            ex_exc_oc;
+    wire            ex_cp0ren;
+    wire [31:0]     ex_cp0rdata;
+    wire            ex_cp0wen;
+    wire [`CP0ADDR] ex_cp0addr;
+    wire            ex_mult;
+    wire            ex_div;
+    wire            ex_mdsign;
+    wire [1 :0]     ex_hilowen;
+    wire [1 :0]     ex_hiloren;
+    wire [31:0]     ex_hilordata;
+    // *EC
+    wire [`EXBITS]  ec_ex;
+    wire [31:0]     ec_pc;
+    wire [31:0]     ec_inst;
+    wire [31:0]     ec_res;
+    wire            ec_load;
+    wire            ec_loadX;
+    wire [3 :0]     ec_lsV;
+    wire            ec_bd;
+    wire [1 :0]     ec_data_addr;
+    wire            ec_al;
+    wire            ec_regwen;
+    wire [4 :0]     ec_wreg;
+    wire            ec_data_req;
+    wire [31:0]     ec_wdata;
+    wire            ec_eret;
+    wire            ec_cp0ren;
+    wire            ec_cp0wen;
+    wire [`CP0ADDR] ec_cp0addr;
+    wire [31:0]     ec_cp0rdata;
+    wire [1 :0]     ec_hiloren;
+    wire [31:0]     ec_hilordata;
+    wire [31:0]     ec_reorder_data;
+    // * CP0
+    wire [31:0]     cp0_epc;
+    wire            ext_int_response;
+    wire            ext_int_soft;
     // *WB
-    wire [31:0] wb_pc;
-    wire [31:0] wb_inst;
-    wire [31:0] wb_res;
-    wire        wb_load;
-    wire        wb_loadX;
-    wire [3 :0] wb_lsV;
-    wire [1 :0] wb_data_addr;
-    wire        wb_al;
-    wire        wb_regwen;
-    wire [4 :0] wb_wreg;
-    wire        wb_data_req;
-    wire        wb_eret;
-    wire        wb_cp0ren;
-    wire [31:0] wb_cp0rdata;
-    wire [1 :0] wb_hiloren;
-    wire [31:0] wb_hilordata;
-    wire [31:0] wb_reorder_data;
+    wire [31:0]     wb_data_rdata;
+    wire [31:0]     wb_pc;
+    wire [31:0]     wb_inst;
+    wire [31:0]     wb_res;
+    wire            wb_load;
+    wire            wb_loadX;
+    wire [3 :0]     wb_lsV;
+    wire [1 :0]     wb_data_addr;
+    wire            wb_al;
+    wire            wb_regwen;
+    wire [4 :0]     wb_wreg;
+    wire            wb_data_req;
+    wire            wb_eret;
+    wire            wb_cp0ren;
+    wire [31:0]     wb_cp0rdata;
+    wire [1 :0]     wb_hiloren;
+    wire [31:0]     wb_hilordata;
+    wire [31:0]     wb_reorder_data;
+    
+    // * TODO: 新增的EC段的数据需要重定向，以及一些条件下流水线的暂停，之后需要添加分支预测!!!
 
-    wire [31:0] cp0_epc;
-
-    wire    pre_ins;
+    // * CU
+    wire    pre_ins;    // * 是否是要用前一次的指令
 
     wire    if_id_stall;
     wire    id_ex_stall;
-    wire    ex_wb_stall;
+    wire    ex_ec_stall;
+    wire    ec_wb_stall;
 
     wire    if_id_refresh;
     wire    id_ex_refresh;
-    wire    ex_wb_refresh;
+    wire    ex_ec_refresh;
+    wire    ec_wb_refresh;
 
     wire    div_mul_stall;
 
-    assign inst_cache = 1'b1; // * TLB相关，后续需要修改
-    assign data_cache = !(ex_res[31:29] == 3'b101);
-    assign cache_req = 1'b0;
-    assign cache_op = 7'b0;
-    assign cache_tag = 32'b0;
+    assign inst_cache   = 1'b1; // * TODO: TLB相关，后续需要修改
+    assign data_cache   = !(ex_res[31:29] == 3'b101);
+    assign cache_req    = 1'b0;
+    assign cache_op     = 7'b0;
+    assign cache_tag    = 32'b0;
 
     reg inst_cache_state;
     reg data_cache_state;
@@ -166,18 +199,23 @@ module cpu_core(
                                 inst_addr_ok    ? BUSY :
                                 inst_data_ok    ? IDLE :
                                 inst_cache_state       ;
-    
-    wire ext_int_response; // TODO:
-    wire ext_int_soft;
+
+    always @(posedge aclk)
+        data_cache_state    <=  !aresetn        ? IDLE :
+                                data_addr_ok    ? BUSY :
+                                data_data_ok    ? IDLE :
+                                data_cache_state       ;
+
     assign inst_req = (!inst_cache_state || inst_data_ok) && !if_inst_ADDRESS_ERROR && !ext_int_response;
+    
     cu u_cu(
-        .id_pc      (id_pc),
+        .id_pc          (id_pc),
 
         .inst_req       (inst_req),
         .inst_addr_ok   (inst_addr_ok),
         .inst_data_ok   (inst_data_ok || (if_inst_ADDRESS_ERROR && !id_bd) || id_addr_error),
 
-        .data_req_pre   (wb_data_req && wb_load),   // * 取数请求
+        .data_req_pre   (wb_data_req && wb_load),   // * wb取数请求
         .data_req       (data_req || (data_cache_state && ex_data_en && !ext_int_response && !ex_data_ADDRESS_ERROR)), // * data_cache_state == 1 -> busy
         .data_addr_ok   (data_addr_ok),
         .data_data_ok   (data_data_ok),
@@ -219,12 +257,9 @@ module cpu_core(
     // * 重定向数据
     wire [31:0] ex_reorder_data =   {32{|ex_hiloren}} & ex_hilordata    |   //* ex段读HI/LO写ex段的rs
                                     {32{ex_al}      } & (ex_pc+32'd8)   |   //* ex段al写GPR[31]
-                                    {32{ex_cp0ren}  } & ex_cp0rdata     |
-                                    {32{!ex_load && !ex_cp0ren && !(|ex_hiloren) && !ex_al}} & ex_res;
+                                    {32{!ex_load && !(|ex_hiloren) && !ex_al}} & ex_res;
 
     // *IF
-    wire [31:0] npc;
-
     pc u_pc(
         .clk            (aclk),
         .resetn         (aresetn),
@@ -272,7 +307,7 @@ module cpu_core(
         .resetn (aresetn),
         .rs     (id_rs),
         .rt     (id_rt),
-        .wen    (wb_regwen && !ex_wb_stall), // * wb被暂停不写
+        .wen    (wb_regwen && !ec_wb_stall), // * wb被暂停不写
         .wreg   (wb_wreg),
         .wdata  (wb_reorder_data),
 
@@ -474,14 +509,8 @@ module cpu_core(
         .rdata  (ex_hilordata)
     );
 
-    // *store命令写入的数据, mtc0命令的写入数据
+    // *store命令写入的数据, mtc0命令的写入数据 TODO:!!mtc0改到ec段, ex_wdata添加ec的重定向
     assign ex_wdata = wb_wreg == ex_rt && wb_regwen ? wb_reorder_data : ex_B;
-
-    always @(posedge aclk)
-        data_cache_state    <=  !aresetn        ? IDLE :
-                                data_addr_ok    ? BUSY :
-                                data_data_ok    ? IDLE :
-                                data_cache_state       ;
 
     // *data_sram and cp0
     assign data_addr = ex_res & 32'h1fff_fffc;
@@ -489,84 +518,115 @@ module cpu_core(
     assign data_size = ex_lsV[3] ? 2'b10 : ex_lsV[1] ? 2'b01 : 2'b00;
     assign ex_data_ADDRESS_ERROR = ex_data_en && (ex_load && (ex_data_ren == 4'b0011 && ex_res[0] || ex_data_ren == 4'b1111 && ex_res[1:0] != 2'b00)
                                     || !ex_load && (ex_data_wen == 4'b0011 && ex_res[0] || ex_data_wen == 4'b1111 && ex_res[1:0] != 2'b00));
-    wire ex_data_req = data_req;
 
     wire [`EXBITS] EX_ex = ex_ex | {2'b0, ex_IntegerOverflow, 2'b0, ex_data_ADDRESS_ERROR};
     assign data_req = (!data_cache_state || data_data_ok) && ex_data_en && !ext_int_response && !(|EX_ex);
-    wire [4:0] exc_excode = ext_int ? `EXC_INT :
-                            EX_ex[5] ? `EXC_AdEL : // *取指地址错
-                            EX_ex[4] ? `EXC_RI :   // *RI
-                            EX_ex[3] ? `EXC_Ov :   // *Overflow
-                            EX_ex[2] ? `EXC_Bp :   // *Break point
-                            EX_ex[1] ? `EXC_Sys :  // *syscall
-                            EX_ex[0] ? 
-                                ex_load ? `EXC_AdEL : `EXC_AdES
-                            : 5'b0;
-    wire [31:0] exc_epc = ex_bd ? ex_pc-32'd4 : ex_pc;
-    wire [31:0] cp0_status, cp0_cause;  // * cp0cause not use for now
-    wire exc_valid = cp0_status[`Status_EXL] ? !wb_eret : // * valid 1 : 表示有例外在处理, 刚传到ex段的例外也算属于在处理
-                    ext_int_response ? 1'b1 : |EX_ex;
-    wire [31:0] cp0_wdata = ex_wdata;
-
-    // * 重定向一致 cp0_wdata, data_wdata
-    assign data_wdata = {   {8{ex_lsV[3]}} & cp0_wdata[31:24],
-                            {8{ex_lsV[2]}} & cp0_wdata[23:16],
-                            {8{ex_lsV[1]}} & cp0_wdata[15: 8],
-                            {8{ex_lsV[0]}} & cp0_wdata[7 : 0]} << {ex_res[1:0], 3'b0};
+    // * 重定向一致 ex_wdata, data_wdata
+    assign data_wdata = {   {8{ex_lsV[3]}} & ex_wdata[31:24],
+                            {8{ex_lsV[2]}} & ex_wdata[23:16],
+                            {8{ex_lsV[1]}} & ex_wdata[15: 8],
+                            {8{ex_lsV[0]}} & ex_wdata[7 : 0]} << {ex_res[1:0], 3'b0};
     assign data_wstrb = ex_data_wen << ex_res[1:0];
 
-    assign ex_exc_oc = !cp0_status[`Status_EXL] && exc_valid;
-    wire [31:0] exc_badvaddr = EX_ex[5] ? ex_pc : ex_res; // FIXME: ex_pc可能需要修改，取地址错误的地址不一定是ex_pc
-    // * CP0 regs
-    cp0 u_cp0(
+    ex_ec_seg u_ex_ec_seg(
         .clk    (aclk),
         .resetn (aresetn),
 
-        .ext_int            (ext_int),
-        .ext_int_response   (ext_int_response),
-        .ext_int_soft       (ext_int_soft), // * 指示本条指令是否写ip_software且会在下一个周期产生软件中断
+        .stall  (ex_ec_stall),      // TODO:
+        .refresh(ex_ec_refresh),    // TODO:
 
-        .wen    (ex_cp0wen),
-        .addr   (ex_cp0addr),
-        .wdata  (cp0_wdata),
-        .rdata  (ex_cp0rdata),
-
-        .exc_valid      (exc_valid),
-        .exc_excode     (exc_excode),
-        .exc_bd         (ex_bd),
-        .exc_epc        (exc_epc),   // * 中断的时候epc 也给ex段的pc
-        .exc_badvaddr   (exc_badvaddr),
-        .exc_eret       (ex_eret),
-
-        .cause      (cp0_cause),
-        .status     (cp0_status),
-        .epc        (cp0_epc)
-    );
-
-    ex_wb_seg u_ex_wb_seg(
-        .clk    (aclk),
-        .resetn (aresetn),
-
-        .stall  (ex_wb_stall),
-        .refresh(ex_wb_refresh),
-
+        .ex_ex          (EX_ex),
         .ex_pc          (ex_pc),
         .ex_inst        (ex_inst),
         .ex_res         (ex_res),
         .ex_load        (ex_load),
         .ex_loadX       (ex_loadX),
         .ex_lsV         (ex_lsV),
+        .ex_bd          (ec_bd),
         .ex_data_addr   (ex_res[1:0]),
         .ex_al          (ex_al),
         .ex_regwen      (ex_regwen),
         .ex_wreg        (ex_wreg),
-        .ex_data_req    (ex_data_req),
+        .ex_data_req    (data_req),
         .ex_eret        (ex_eret),
+        .ex_cp0wen      (ex_cp0wen),
+        .ex_cp0addr     (ex_cp0addr),
         .ex_cp0ren      (ex_cp0ren),
-        .ex_cp0rdata    (ex_cp0rdata),
         .ex_hiloren     (ex_hiloren),
         .ex_hilordata   (ex_hilordata),
 
+        .ec_ex          (ec_ex),
+        .ec_pc          (ec_pc),
+        .ec_inst        (ec_inst),
+        .ec_res         (ec_res),
+        .ec_load        (ec_load),
+        .ec_loadX       (ec_loadX),
+        .ec_lsV         (ec_lsV),
+        .ec_bd          (ec_bd),
+        .ec_data_addr   (ec_data_addr),
+        .ec_al          (ec_al),
+        .ec_regwen      (ec_regwen),
+        .ec_wreg        (ec_wreg),
+        .ec_data_req    (ec_data_req),
+        .ec_eret        (ec_eret),
+        .ec_cp0wen      (ec_cp0wen),
+        .ec_cp0addr     (ec_cp0addr),
+        .ec_cp0ren      (ec_cp0ren),
+        .ec_hiloren     (ec_hiloren),
+        .ec_hilordata   (ec_hilordata)
+    );
+
+    ec u_ec(
+        .ext_int        (ext_int),
+        .clk            (aclk),
+        .resetn         (aresetn),
+
+        .ec_ex          (ec_ex),
+        .ec_pc          (ec_pc),
+        .ec_res         (ec_res),
+        .ec_al          (ec_al),
+        .ec_load        (ec_load),
+        .ec_cp0ren      (ec_cp0ren),
+        .ec_cp0wen      (ec_cp0wen),
+        .ec_cp0addr     (ec_cp0addr),
+        .ec_wdata       (ec_wdata),
+        .ec_hiloren     (ec_hiloren),
+        .ec_hilordata   (ec_hilordata),
+        .wb_eret        (wb_eret),
+
+        // * O
+        .ext_int_soft       (ext_int_soft),
+        .ext_int_response   (ext_int_response),
+        .ec_cp0rdata        (ec_cp0rdata),
+        .cp0_epc            (cp0_epc)
+    );
+
+    ec_wb_seg u_ec_wb_seg(
+        .clk    (aclk),
+        .resetn (aresetn),
+
+        .stall  (ec_wb_stall),
+        .refresh(ec_wb_refresh),
+
+        .ec_data_rdata  (data_rdata),
+        .ec_pc          (ec_pc),
+        .ec_inst        (ec_inst),
+        .ec_res         (ec_res),
+        .ec_load        (ec_load),
+        .ec_loadX       (ec_loadX),
+        .ec_lsV         (ec_lsV),
+        .ec_data_addr   (ec_res[1:0]),
+        .ec_al          (ec_al),
+        .ec_regwen      (ec_regwen),
+        .ec_wreg        (ec_wreg),
+        .ec_data_req    (data_req),
+        .ec_eret        (ec_eret),
+        .ec_cp0ren      (ec_cp0ren),
+        .ec_cp0rdata    (ec_cp0rdata),
+        .ec_hiloren     (ec_hiloren),
+        .ec_hilordata   (ec_hilordata),
+
+        .wb_data_rdata  (wb_data_rdata),
         .wb_pc          (wb_pc),
         .wb_inst        (wb_inst),
         .wb_res         (wb_res),
@@ -587,7 +647,7 @@ module cpu_core(
 
     // *WB
     wb u_wb(
-        .data_rdata     (data_rdata),
+        .data_rdata     (wb_data_rdata),
         .wb_pc          (wb_pc),
         .wb_res         (wb_res),
         .wb_load        (wb_load),
@@ -606,7 +666,7 @@ module cpu_core(
 
     // *debug
     assign debug_wb_pc          = wb_pc;
-    assign debug_wb_rf_wen      = {4{wb_regwen && !ex_wb_stall}};
+    assign debug_wb_rf_wen      = {4{wb_regwen && !ec_wb_stall}};
     assign debug_wb_rf_wnum     = wb_wreg;
     assign debug_wb_rf_wdata    = wb_reorder_data;
 

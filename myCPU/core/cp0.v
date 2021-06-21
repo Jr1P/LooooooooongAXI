@@ -7,13 +7,10 @@ module cp0 (
 
     // * interrput
     input  [5 :0]   ext_int,
-    output          ext_int_response,   // *中断响应
-    output          ext_int_soft,       // *软件中断
 
     input           wen,    // *write engine
     input  [7 :0]   addr,   // *write/read address
     input  [31:0]   wdata,  // *write in data
-    output [31:0]   rdata,  // *read out data
 
     // * exception occur
     input           exc_valid,   // * 1: 例外处理
@@ -23,6 +20,10 @@ module cp0 (
     input [31:0]    exc_badvaddr,// * exception BadVAddr
     input           exc_eret,    // * 1: eret
 
+    output [31:0]   rdata,  // *read out data
+    
+    output          ext_int_response,   // *中断响应
+    output          ext_int_soft,       // *软件中断
     // * cp0 regs
     output [31:0]       cause,
     output [31:0]       status,
