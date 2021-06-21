@@ -57,6 +57,9 @@ module cu(
     wire ex_rel_rs  = id_branch && id_rs_ren && ex_regwen && ex_wreg == id_rs;
     // * 判断ex段写的reg是否为当前id段的rt
     wire ex_rel_rt  = id_branch && id_rt_ren && ex_regwen && ex_wreg == id_rt;
+    // * 判断ec段cp0regs读出来，写到的reg是否为id段的rs，只需考虑cp0读指令
+    wire ec_rel_rs  = id_branch && id_rs_ren && ec_regwen && ec_wreg == id_rs;
+    wire ec_rel_rs  = id_branch && id_rs_ren && ec_regwen && ec_wreg == id_rs;
 
     wire inst_stall = (inst_req && !inst_addr_ok) || !inst_data_ok;
     // * load若addr被接收就不暂停，store需要addr被接收且data写入才能不暂停
