@@ -245,6 +245,7 @@ module id(
     wire    ReservedIns  = ~|{`DECODED_OPS};// ReservedInstruction Ex 
     wire    BreakEx      = op_break;        // Break point Ex
     wire    SyscallEx    = op_syscall;      // System call Ex
+    // *                    取指地址错       保留指令  Overflow  陷阱例外 系统调用   访存地址错
     assign  id_ex        = {id_addr_error, ReservedIns, 1'b0, BreakEx, SyscallEx, 1'b0};
 
 endmodule

@@ -43,8 +43,10 @@ module ec (
                                         : 5'b0      ;
     wire [31:0] exc_epc = ec_bd ? ec_pc-32'd4 : ec_pc;
     wire [31:0] cp0_status, cp0_cause;  // * cp0cause not use for now
-    wire exc_valid = cp0_status[`Status_EXL] ? !wb_eret : // * valid 1 : 表示有例外在处理, 刚传到ex段的例外也算属于在处理
-                    ext_int_response ? 1'b1 : |ec_ex;
+    // * valid 1 : 表示有例外在处理, 刚传到ex段的例外也算属于在处理
+    wire exc_valid =    cp0_status[`Status_EXL] ? // * exl位高表示在异常处理
+                            !wb_eret ? 1'b1 : ex_exc_oc  // * 如果wb段eret了，就看ex段有没有新异常提交
+                        : (ext_int_response || (|ec_ex));
 
     assign ex_exc_oc = !cp0_status[`Status_EXL] && exc_valid;
     wire [31:0] exc_badvaddr = ec_ex[5] ? ec_pc : ec_res; // FIXME: ec_pc可能需要修改，取地址错误的地址不一定是ec_pc
