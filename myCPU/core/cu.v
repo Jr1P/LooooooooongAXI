@@ -8,7 +8,7 @@ module cu(
     input       inst_addr_ok,
     input       inst_data_ok,
 
-    input       data_req_pre,   // 前一个req，即wb段的
+    input       wb_data_req,   // 前一个req，即wb段的
     input       data_req,       // 目前的req，即ex段的
     input       data_addr_ok,
     input       data_data_ok,
@@ -58,14 +58,14 @@ module cu(
     wire ex_branch_stall = (ex_rel_rs || ex_rel_rt) && ex_load; // * ex段 数据相关导致分支预测暂停
     assign pre_ins = (div_mul_stall || data_stall || ex_wb_stall) && !inst_stall;
 
-    wire load_load = ex_load && data_req_pre && data_data_ok; // * wb load ex load
+    wire load_load = ex_load && wb_data_req && data_data_ok; // * wb load ex load
 
-    assign ex_wb_stall = (data_stall && !load_load) || (data_req_pre && !data_data_ok); // * 没返回时持续将data_req挂高
+    assign ex_wb_stall = (data_stall && !load_load) || (wb_data_req && !data_data_ok); // * 没返回时持续将data_req挂高
     assign id_ex_stall = !id_pc || ex_wb_stall || div_mul_stall || data_stall;  // *id recode
     assign if_id_stall = ex_branch_stall || inst_stall || (id_ex_stall && id_pc);
 
-    assign if_id_refresh = exc_oc/* || eret*/;
-    assign id_ex_refresh = !id_ex_stall && !ext_int_soft && (eret || exc_oc || ex_branch_stall || if_id_stall);
+    assign if_id_refresh = exc_oc || eret;
+    assign id_ex_refresh = !id_ex_stall && !ext_int_soft && (exc_oc || ex_branch_stall || if_id_stall);
     assign ex_wb_refresh = !ex_wb_stall && (exc_oc || div_mul_stall || (data_stall && load_load));
 
 endmodule

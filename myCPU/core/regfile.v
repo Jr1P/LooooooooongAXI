@@ -19,7 +19,7 @@ module regfile(
 
     reg [31:0] GPR[31:1];
 
-    always @(posedge clk) if(wen) GPR[wreg] <= wdata;
+    always @(posedge clk) if(wen && wreg) GPR[wreg] <= wdata;
 
     assign outA = !rs ? 32'b0 : (wen && wreg == rs) ? wdata : GPR[rs];
     assign outB = !rt ? 32'b0 : (wen && wreg == rt) ? wdata : GPR[rt];

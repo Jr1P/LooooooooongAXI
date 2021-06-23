@@ -177,7 +177,7 @@ module cpu_core(
         .inst_addr_ok   (inst_addr_ok),
         .inst_data_ok   (inst_data_ok || (if_inst_ADDRESS_ERROR && !id_bd) || id_addr_error),
 
-        .data_req_pre   (wb_data_req && wb_load),   // * 取数请求
+        .wb_data_req    (wb_data_req && wb_load),   // * 取数请求
         .data_req       (data_req || (data_cache_state && ex_data_en && !ext_int_response && !ex_data_ADDRESS_ERROR)), // * data_cache_state == 1 -> busy
         .data_addr_ok   (data_addr_ok),
         .data_data_ok   (data_data_ok),
@@ -191,7 +191,7 @@ module cpu_core(
         .ex_rt      (ex_rt),
 
         .exc_oc     (ex_exc_oc),
-        .eret       (ex_eret),
+        .eret       (id_eret),
 
         .id_branch  (id_branch),
         .id_rs_ren  (id_rs_ren),
@@ -265,7 +265,7 @@ module cpu_core(
     );
 
     // *ID 
-    assign id_inst  = exc_oc_invalid || !inst_data_ok ? 32'b0 : inst_rdata; // * exc_oc 后一条以及 inst_data_ok低时都是无效指令
+    assign id_inst  = exc_oc_invalid || !inst_data_ok || id_addr_error ? 32'b0 : inst_rdata; // * exc_oc 后一条以及 inst_data_ok低时都是无效指令
 
     regfile u_regfile(
         .clk    (aclk),
@@ -487,7 +487,7 @@ module cpu_core(
     assign data_addr = ex_res & 32'h1fff_fffc;
     assign data_wr = |ex_data_wen;
     assign data_size = ex_lsV[3] ? 2'b10 : ex_lsV[1] ? 2'b01 : 2'b00;
-    assign ex_data_ADDRESS_ERROR = ex_data_en && (ex_load && (ex_data_ren == 4'b0011 && ex_res[0] || ex_data_ren == 4'b1111 && ex_res[1:0] != 2'b00)
+    assign ex_data_ADDRESS_ERROR = !(wb_data_req && wb_load && !data_data_ok) && ex_data_en && (ex_load && (ex_data_ren == 4'b0011 && ex_res[0] || ex_data_ren == 4'b1111 && ex_res[1:0] != 2'b00)
                                     || !ex_load && (ex_data_wen == 4'b0011 && ex_res[0] || ex_data_wen == 4'b1111 && ex_res[1:0] != 2'b00));
     wire ex_data_req = data_req;
 
@@ -504,8 +504,9 @@ module cpu_core(
                             : 5'b0;
     wire [31:0] exc_epc = ex_bd ? ex_pc-32'd4 : ex_pc;
     wire [31:0] cp0_status, cp0_cause;  // * cp0cause not use for now
-    wire exc_valid = cp0_status[`Status_EXL] ? !wb_eret : // * valid 1 : 表示有例外在处理, 刚传到ex段的例外也算属于在处理
-                    ext_int_response ? 1'b1 : |EX_ex;
+     // * 如果wb段eret了，就看ex段有没有新异常提交
+    wire exc_valid =    cp0_status[`Status_EXL] && !wb_eret ? 1'b1 // * exl位高表示在异常处理
+                        : (ext_int_response || (|EX_ex));
     wire [31:0] cp0_wdata = ex_wdata;
 
     // * 重定向一致 cp0_wdata, data_wdata
