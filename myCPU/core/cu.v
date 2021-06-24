@@ -14,7 +14,7 @@ module cu(
     input       data_data_ok,
     input       wb_data_ok,
 
-    input       ext_int_soft,
+    // input       ext_int_soft,
 
     input       ex_rs_ren,
     input [4:0] ex_rs,
@@ -72,7 +72,7 @@ module cu(
 
     wire ex_branch_stall = (ex_rel_rs || ex_rel_rt) && (ex_load || ex_cp0ren); // * ex段 数据相关导致分支预测暂停
     wire ec_branch_stall = (ec_rel_rs || ec_rel_rt) && ec_data_req;
-    assign pre_ins = (div_mul_stall || data_stall || ec_wb_stall) && !inst_stall;
+    assign pre_ins = (div_mul_stall || data_stall || ec_wb_stall || ex_branch_stall || ec_branch_stall) && !inst_stall;
 
     wire load_load = ex_load && ec_data_req && data_data_ok; // * ec load ex load且data_ok高，说明前一个的load的数据返回了
     wire ec_load_to_ex_stall = ec_data_req && (ex_rs_ren && ec_wreg == ex_rs || ex_rt_ren && ec_wreg == ex_rt);
@@ -83,11 +83,11 @@ module cu(
     // *                如果data_stall且 !load_load  或 ec是load但没返回data_ok
     assign ec_wb_stall = (data_stall && !load_load) || (ec_data_req && !data_data_ok);
     assign ex_ec_stall = ec_wb_stall || (ec_load_to_ex_stall && !wb_data_ok);
-    assign id_ex_stall = !id_pc || (!id_recode && (ex_ec_stall || div_mul_stall || data_stall));  // *id recode
+    assign id_ex_stall = (!id_pc && !eret) || (!id_recode && (ex_ec_stall || div_mul_stall || data_stall));  // *id recode
     assign if_id_stall = ex_branch_stall || ec_branch_stall || inst_stall || (id_ex_stall && id_pc) || id_recode;
 
     assign if_id_refresh = exc_oc || eret;
-    assign id_ex_refresh = !id_recode && !id_ex_stall && !ext_int_soft && (eret || exc_oc || ex_branch_stall || if_id_stall);
+    assign id_ex_refresh = !id_recode && !id_ex_stall /* && !ext_int_soft */ && (exc_oc || ex_branch_stall || ec_branch_stall || if_id_stall);
     assign ex_ec_refresh = (ec_load_to_ex_stall && !ec_wb_stall) || !ex_ec_stall && (exc_oc || div_mul_stall || (data_stall && load_load));
     assign ec_wb_refresh = !ec_wb_stall && exc_oc;
 

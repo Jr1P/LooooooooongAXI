@@ -18,11 +18,12 @@ module ec (
     input [31:0]    ec_wdata,
     input [1 :0]    ec_hiloren,
     input [31:0]    ec_hilordata,
+    input           ec_bd,
     input           ec_eret,
     input           wb_eret,
 
     output          exc_oc,
-    output          ext_int_soft,
+    // output          ext_int_soft,
     output          ext_int_response,
     output [31:0]   cp0rdata,
     output [31:0]   cp0_epc,
@@ -38,7 +39,8 @@ module ec (
                             ec_ex[0]    ? 
                                 ec_load ? `EXC_AdEL : `EXC_AdES
                                         : 5'b0      ;
-    wire [31:0] exc_epc = ec_bd ? ec_pc-32'd4 : ec_pc;
+    wire [31:0] exc_epc =   ec_cp0wen   ? ec_pc+32'd4 : // * 软件中断
+                            ec_bd       ? ec_pc-32'd4 : ec_pc; // * 延迟槽和通常情况
     wire [31:0] cp0_status, cp0_cause;  // * cp0cause not use for now
     // * valid 1 : 表示有例外在处理, 刚传到ex段的例外也算属于在处理
     // * exl位高表示在异常处理, 如果wb段eret了，就看ec段有没有新异常提交
@@ -73,7 +75,7 @@ module ec (
         .rdata              (cp0rdata),
 
         .ext_int_response   (ext_int_response),
-        .ext_int_soft       (ext_int_soft), // * 指示本条指令是否写ip_software且会在下一个周期产生软件中断
+        // .ext_int_soft       (ext_int_soft), // * 指示本条指令是否写ip_software且会在下一个周期产生软件中断
 
         .cause      (cp0_cause),
         .status     (cp0_status),

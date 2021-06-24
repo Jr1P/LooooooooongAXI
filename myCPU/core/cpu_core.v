@@ -148,7 +148,7 @@ module cpu_core(
     // * CP0
     wire [31:0]     cp0_epc;
     wire            ext_int_response;
-    wire            ext_int_soft;
+    // wire            ext_int_soft;
     // *WB
     wire            wb_data_ok;
     wire [31:0]     wb_data_rdata;
@@ -224,7 +224,7 @@ module cpu_core(
         .data_data_ok   (data_data_ok),
         .wb_data_ok     (wb_data_ok),
 
-        .ext_int_soft   (ext_int_soft),
+        // .ext_int_soft   (ext_int_soft),
 
         .ex_rs_ren  (ex_rs_ren),
         .ex_rs      (ex_rs),
@@ -285,6 +285,7 @@ module cpu_core(
         .npc            (npc)
     );
 
+    // *               取前一条       ex_inst重译码
     assign inst_addr =  pre_ins || (id_recode && !inst_stall) ? npc-32'd4 : npc;
     assign if_inst_ADDRESS_ERROR = npc[1:0] != 2'b00;
 
@@ -312,9 +313,9 @@ module cpu_core(
     );
 
     // *ID   *          exc_oc 后一条以及inst_data_ok低和取指地址错时都是无效指令
-    assign id_inst  =   exc_oc_invalid || id_addr_error ?   32'b0     :
-                        id_recode                       ?   ex_inst   :
-                                                            inst_rdata;
+    assign id_inst  =   exc_oc_invalid || (!inst_data_ok && !id_recode) || id_addr_error    ?   32'b0       :
+                        id_recode                                                           ?   ex_inst     :
+                                                                                                inst_rdata  ;
     wire [31:0] id_pc_in = id_recode ? ex_pc : id_pc;
 
     regfile u_regfile(
@@ -525,7 +526,7 @@ module cpu_core(
         .hiwdata(hiwdata),
         .lowdata(lowdata),
         .ren    (ex_hiloren),
-        .exc_oc (ec_exc_oc),
+        .exc_oc (ec_exc_oc && (|ex_hilowen)), // * mtc0指令且ec段异常发生
         .rdata  (ex_hilordata)
     );
 
@@ -541,7 +542,7 @@ module cpu_core(
                                     || !ex_load && (ex_data_wen == 4'b0011 && data_addr[0] || ex_data_wen == 4'b1111 && data_addr[1:0] != 2'b00));
 
     wire [`EXBITS] EX_ex = ex_ex | {2'b0, ex_IntegerOverflow, 2'b0, ex_data_ADDRESS_ERROR};
-    assign data_req = (!data_cache_state || data_data_ok) && ex_data_en && !ext_int_response && !(|EX_ex);
+    assign data_req = (!data_cache_state || data_data_ok) && ex_data_en && !ext_int_response && !(|EX_ex) && !ec_exc_oc;
     // * 重定向一致 ex_wdata, data_wdata
     assign data_wdata = {   {8{ex_lsV[3]}} & ex_wdata[31:24],
                             {8{ex_lsV[2]}} & ex_wdata[23:16],
@@ -564,7 +565,7 @@ module cpu_core(
         .ex_load        (ex_load),
         .ex_loadX       (ex_loadX),
         .ex_lsV         (ex_lsV),
-        .ex_bd          (ec_bd),
+        .ex_bd          (ex_bd),
         .ex_data_addr   (data_addr[1:0]),
         .ex_al          (ex_al),
         .ex_regwen      (ex_regwen),
@@ -618,12 +619,13 @@ module cpu_core(
         .ec_wdata       (ec_wdata),
         .ec_hiloren     (ec_hiloren),
         .ec_hilordata   (ec_hilordata),
+        .ec_bd          (ec_bd),
         .ec_eret        (ec_eret),
         .wb_eret        (wb_eret),
 
         // * O
         .exc_oc             (ec_exc_oc),
-        .ext_int_soft       (ext_int_soft),
+        // .ext_int_soft       (ext_int_soft),
         .ext_int_response   (ext_int_response),
         .cp0rdata           (ec_cp0rdata),
         .cp0_epc            (cp0_epc),

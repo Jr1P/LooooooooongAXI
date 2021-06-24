@@ -23,7 +23,7 @@ module cp0 (
     output [31:0]   rdata,  // *read out data
     
     output          ext_int_response,   // *中断响应
-    output          ext_int_soft,       // *软件中断
+    // output          ext_int_soft,       // *软件中断
     // * cp0 regs
     output [31:0]       cause,
     output [31:0]       status,
@@ -104,7 +104,7 @@ module cp0 (
     // *                31       30                15:10        9:8                 6:2
     assign cause = {Cause_BD, Cause_TI, 14'b0, ip_hardware, ip_software, 1'b0, Cause_ExcCode, 2'b0};
     wire cause_wen = wen && addr == `CP0_Cause;
-    wire [5:0] hardware_int = ext_int | {timer_int, 5'b0};
+    wire [5:0] hardware_int = ext_int/* | {timer_int, 5'b0}*/;
     always @(posedge clk) begin
         // *BD
         if(!resetn)                         Cause_BD <= 1'b0;
@@ -128,9 +128,9 @@ module cp0 (
         if(epc_wen)                         epc <= wdata;
         else if(exc_valid && !Status_EXL)   epc <= exc_epc;  // *exc_epc: if Cause.BD is 1, exc_epc == pc-4
     end
+    wire [1:0] ext_int_soft     = {2{cause_wen}} & wdata[`Cause_IP_SOFTWARE];
     // *                            存在未被屏蔽的中断                 没有例外在处理   中断使能开启
-    assign ext_int_response = ({hardware_int, ip_software} & Status_IM) && !Status_EXL && Status_IE;
-    assign ext_int_soft = cause_wen & (|wdata[`Cause_IP_SOFTWARE]);
+    assign  ext_int_response    = ({hardware_int, ext_int_soft} & Status_IM) && !Status_EXL && Status_IE;
 
     // * Config0 (16, 0) | read and partially writeable |
     wire config0_wen = wen && addr == `CP0_Config0;
