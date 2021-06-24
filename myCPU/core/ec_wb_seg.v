@@ -7,6 +7,7 @@ module ec_wb_seg (
     input   stall,
     input   refresh,
 
+    input           ec_data_ok,
     input [31:0]    ec_data_rdata,
     input [31:0]    ec_pc,
     input [31:0]    ec_inst,
@@ -20,8 +21,6 @@ module ec_wb_seg (
 
     input           ec_regwen,
     input [4 :0]    ec_wreg,
-    
-    input           ec_data_req,
 
     input           ec_eret,
     input           ec_cp0ren,
@@ -29,6 +28,7 @@ module ec_wb_seg (
     input [1 :0]    ec_hiloren,
     input [31:0]    ec_hilordata,
 
+    output reg          wb_data_ok,
     output reg [31:0]   wb_data_rdata,
     output reg [31:0]   wb_pc,
     output reg [31:0]   wb_inst,
@@ -42,8 +42,6 @@ module ec_wb_seg (
     output reg          wb_regwen,
     output reg [4 :0]   wb_wreg,
 
-    output reg          wb_data_req,
-
     output reg          wb_eret,
     output reg          wb_cp0ren,
     output reg [31:0]   wb_cp0rdata,
@@ -53,6 +51,7 @@ module ec_wb_seg (
 
     always @(posedge clk) begin
         if(!resetn || refresh) begin
+            wb_data_ok      <= 1'b0;
             wb_data_rdata   <= 32'b0;
             wb_pc           <= 32'b0;
             wb_inst         <= 32'b0;
@@ -64,7 +63,6 @@ module ec_wb_seg (
             wb_al           <= 1'b0;
             wb_regwen       <= 1'b0;
             wb_wreg         <= 5'b0;
-            wb_data_req     <= 1'b0;
             wb_eret         <= 1'b0;
             wb_cp0ren       <= 1'b0;
             wb_cp0rdata     <= 32'b0;
@@ -72,6 +70,7 @@ module ec_wb_seg (
             wb_hilordata    <= 32'b0;
         end
         else if(!stall) begin
+            wb_data_ok      <= ec_data_ok;
             wb_data_rdata   <= ec_data_rdata;
             wb_pc           <= ec_pc;
             wb_inst         <= ec_inst;
@@ -83,7 +82,6 @@ module ec_wb_seg (
             wb_al           <= ec_al;
             wb_regwen       <= ec_regwen;
             wb_wreg         <= ec_wreg;
-            wb_data_req     <= ec_data_req;
             wb_eret         <= ec_eret;
             wb_cp0ren       <= ec_cp0ren;
             wb_cp0rdata     <= ec_cp0rdata;

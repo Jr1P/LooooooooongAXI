@@ -241,7 +241,7 @@ module id(
 
 
     // * ex
-    assign eret         = op_eret;
+    assign  eret         = op_eret;
     wire    ReservedIns  = ~|{`DECODED_OPS};// ReservedInstruction Ex 
     wire    BreakEx      = op_break;        // Break point Ex
     wire    SyscallEx    = op_syscall;      // System call Ex

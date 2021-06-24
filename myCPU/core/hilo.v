@@ -18,7 +18,7 @@ module hilo (
             hi <= 32'b0;
             lo <= 32'b0;
         end
-        else /*if(!exc_oc)*/ begin
+        else if(!exc_oc) begin
             if(wen[1] == 1'b1) hi <= hiwdata;
             if(wen[0] == 1'b1) lo <= lowdata;
         end

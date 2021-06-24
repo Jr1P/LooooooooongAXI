@@ -26,10 +26,10 @@ module wb (
                                 {16{!wb_lsV[2] && !wb_lsV[3] && wb_lsV[1] && wb_loadX && wb_data_rdata[15]}} |
                                 {16{!wb_lsV[2] && !wb_lsV[3] && !wb_lsV[1] && wb_lsV[0] && wb_loadX && wb_data_rdata[7]}};
     // * 重定向数据
-    assign wb_reorder_data  =   {32{wb_load}    } & wb_rdata        |   //* wb段load写rs
-                                {32{wb_cp0ren}  } & wb_cp0rdata     |   //* wb段读cp0写rs
-                                {32{|wb_hiloren}} & wb_hilordata    |   //* wb段读HI/LO写rs
-                                {32{wb_al}      } & (wb_pc+32'd8)   |   //* wb段al写GPR[31]
-                                {32{!wb_load && !wb_cp0ren && !(|wb_hiloren) && !wb_al}} & wb_res;
+    assign wb_reorder_data  =   wb_load         ? wb_rdata      :   //* wb段load写rs
+                                wb_cp0ren       ? wb_cp0rdata   :   //* wb段读cp0写rs
+                                (|wb_hiloren)   ? wb_hilordata  :   //* wb段读HI/LO写rs
+                                wb_al           ? wb_pc+32'd8   :   //* wb段al写GPR[31]
+                                                  wb_res        ;
 
 endmodule
