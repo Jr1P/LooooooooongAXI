@@ -93,6 +93,7 @@ module cpu_core(
     wire [31:0]     ex_Imm;
     wire [31:0]     ex_A;
     wire [31:0]     ex_B;
+    wire [31:0]     ex_daddr;
     wire            ex_rs_ren;
     wire            ex_rt_ren;
     wire            ex_al;
@@ -239,12 +240,12 @@ module cpu_core(
         .id_rt_ren  (id_rt_ren),
         .id_rt      (id_rt),
 
-        .ex_regwen  (ex_regwen),    
-        .ex_load    (ex_load),
-        .ex_cp0ren  (ex_cp0ren),
-        .ex_wreg    (ex_wreg),
+        // .ex_regwen  (ex_regwen),    
+        .ex_dload_req   (ex_load && data_req),
+        .ex_cp0ren      (ex_cp0ren),
+        .ex_wreg        (ex_wreg),
 
-        .ec_regwen  (ec_regwen),    
+        // .ec_regwen  (ec_regwen),    
         .ec_load    (ec_load),
         .ec_wreg    (ec_wreg),
 
@@ -288,13 +289,12 @@ module cpu_core(
 
     // *               取前一条       ex_inst重译码
     assign inst_addr =  pre_ins || (id_recode && !inst_stall) ? npc-32'd4 : npc;
-    assign if_inst_ADDRESS_ERROR = npc[1:0] != 2'b00;
+    assign if_inst_ADDRESS_ERROR = npc[0] | npc[1];
 
     reg exc_oc_invalid; // * 异常发生后紧接着取出的指令不是正确指令
     always @(posedge aclk) begin
-        if(!aresetn) exc_oc_invalid <= 1'b0;
-        else exc_oc_invalid <=  ec_exc_oc ? 1'b1 :
-                                exc_oc_invalid ? if_id_stall || if_id_refresh : 1'b0;
+        if(!aresetn)    exc_oc_invalid <=   1'b0;
+        else            exc_oc_invalid <=   ec_exc_oc || (exc_oc_invalid && (if_id_stall || if_id_refresh));
     end
 
     if_id_seg u_if_id_seg(
@@ -335,8 +335,7 @@ module cpu_core(
     wire [31:0] re_rs =     ex_regwen && ex_wreg == id_rs   ? ex_reorder_data   :
                             ec_regwen && ec_wreg == id_rs   ? ec_reorder_data   :
                             wb_regwen && wb_wreg == id_rs   ? wb_reorder_data   : regouta;
-                        //id_branch && id_rs_ren ? // * 分支指令且需要读rs
-                        // : 32'b0;
+
     wire [31:0] re_rt =     ex_regwen && ex_wreg == id_rt   ? ex_reorder_data   :
                             ec_regwen && ec_wreg == id_rt   ? ec_reorder_data   :
                             wb_regwen && wb_wreg == id_rt   ? wb_reorder_data   : regoutb;
@@ -466,6 +465,7 @@ module cpu_core(
         .sa     (`GET_SA(ex_inst)),
 
         .IntegerOverflow    (ex_IntegerOverflow),
+        .daddr              (ex_daddr),
         .res                (ex_res)
     );
 
@@ -534,10 +534,10 @@ module cpu_core(
                         wb_wreg == ex_rt && wb_regwen ? wb_reorder_data : ex_B;
 
     // *data_sram and cp0
-    assign data_addr = (inAlu1 + inAlu2) & 32'h1fff_ffff;
+    assign data_addr = ex_daddr & 32'h1fff_ffff;
     assign data_wr = |ex_data_wen;
     assign data_size = ex_lsV[3] ? 2'b10 : ex_lsV[1] ? 2'b01 : 2'b00;
-    assign ex_data_ADDRESS_ERROR = !(ec_data_req && ec_load && !data_data_ok) && ex_data_en && (ex_load && (ex_data_ren == 4'b0011 && data_addr[0] || ex_data_ren == 4'b1111 && data_addr[1:0] != 2'b00)
+    assign ex_data_ADDRESS_ERROR = !(ec_data_req && ec_load /*&& !data_data_ok*/) && ex_data_en && (ex_load && (ex_data_ren == 4'b0011 && data_addr[0] || ex_data_ren == 4'b1111 && data_addr[1:0] != 2'b00)
                                     || !ex_load && (ex_data_wen == 4'b0011 && data_addr[0] || ex_data_wen == 4'b1111 && data_addr[1:0] != 2'b00));
 
     wire [`EXBITS] EX_ex = ex_ex | {2'b0, ex_IntegerOverflow, 2'b0, ex_data_ADDRESS_ERROR};
