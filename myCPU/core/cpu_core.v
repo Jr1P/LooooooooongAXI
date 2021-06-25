@@ -217,14 +217,13 @@ module cpu_core(
         .inst_req       (inst_req),
         .inst_addr_ok   (inst_addr_ok),
         .inst_data_ok   (inst_data_ok || (if_inst_ADDRESS_ERROR && !id_bd) || id_addr_error),
+        // .inst_data_ok   (inst_data_ok || if_inst_ADDRESS_ERROR || id_addr_error),
 
-        .ec_data_req    (ec_data_req && ec_load),   // * ec取数请求
+        .ec_dload_req   (ec_data_req && ec_load),   // * ec取数请求
         .data_req       (data_req || (data_cache_state && ex_data_en && !ext_int_response && !ex_data_ADDRESS_ERROR)), // * data_cache_state == 1 -> busy
         .data_addr_ok   (data_addr_ok),
         .data_data_ok   (data_data_ok),
         .wb_data_ok     (wb_data_ok),
-
-        // .ext_int_soft   (ext_int_soft),
 
         .ex_rs_ren  (ex_rs_ren),
         .ex_rs      (ex_rs),
@@ -282,6 +281,8 @@ module cpu_core(
 
         .eret           (id_eret),  // * eret
         .epc            (cp0_epc),  // * epc from cp0
+        // .pre_inst       (pre_ins || (id_recode && !inst_stall)),
+
         .npc            (npc)
     );
 
@@ -331,16 +332,14 @@ module cpu_core(
         .outB   (regoutb)
     );
 
-    wire [31:0] re_rs = id_branch && id_rs_ren ? // * 分支指令且需要读rs
-                            ex_regwen && ex_wreg == id_rs   ? ex_reorder_data   :
+    wire [31:0] re_rs =     ex_regwen && ex_wreg == id_rs   ? ex_reorder_data   :
                             ec_regwen && ec_wreg == id_rs   ? ec_reorder_data   :
-                            wb_regwen && wb_wreg == id_rs   ? wb_reorder_data   : regouta
-                        : 32'b0;
-    wire [31:0] re_rt = id_branch && id_rt_ren ? // * 分支指令且需要读rt
-                            ex_regwen && ex_wreg == id_rt   ? ex_reorder_data   :
+                            wb_regwen && wb_wreg == id_rs   ? wb_reorder_data   : regouta;
+                        //id_branch && id_rs_ren ? // * 分支指令且需要读rs
+                        // : 32'b0;
+    wire [31:0] re_rt =     ex_regwen && ex_wreg == id_rt   ? ex_reorder_data   :
                             ec_regwen && ec_wreg == id_rt   ? ec_reorder_data   :
-                            wb_regwen && wb_wreg == id_rt   ? wb_reorder_data   : regoutb
-                        : 32'b0;
+                            wb_regwen && wb_wreg == id_rt   ? wb_reorder_data   : regoutb;
 
 
     id u_id(
@@ -554,8 +553,8 @@ module cpu_core(
         .clk    (aclk),
         .resetn (aresetn),
 
-        .stall  (ex_ec_stall),      // TODO:
-        .refresh(ex_ec_refresh),    // TODO:
+        .stall  (ex_ec_stall),
+        .refresh(ex_ec_refresh),
 
         .ex_ex          (EX_ex),
         .ex_pc          (ex_pc),
