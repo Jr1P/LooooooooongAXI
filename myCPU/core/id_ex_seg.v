@@ -5,10 +5,13 @@ module id_ex_seg (
     input   clk,
     input   resetn,
 
-    input   stall,
-    input   refresh,
+    input       stall,
+    input       refresh,
+    input [1:0] recode,
 
     input [`EXBITS] id_ex,
+
+    // input [31:0]    wb_reorder_data,
 
     input [31:0]    id_pc,
     input [31:0]    id_inst,
@@ -87,7 +90,13 @@ module id_ex_seg (
     end
 
     always @(posedge clk) begin
-        if(!resetn || refresh) begin
+        if(recode[0]|recode[1]) begin
+            if(recode[0])
+                ex_B    <= id_B;
+            if(recode[1])
+                ex_A    <= id_A;
+        end
+        else if(!resetn || refresh) begin
             ex_ex       <= `NUM_EX'b0;
             ex_imm      <= 1'b0;
             ex_Imm      <= 32'h0;

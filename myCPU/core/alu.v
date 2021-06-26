@@ -10,14 +10,17 @@ module alu(
     input       [4 :0]  sa,                 // shift amount
 
     output              IntegerOverflow,    // IntegerOverflow Exception
+    output      [31:0]  daddr,
     output      [31:0]  res                // result
 );
 
     wire            Cin;
     wire    [4 :0]  sav     = A[4:0];   // shift amount variable
 
+    assign daddr = A+B;
+
     assign {Cin, res} = func == `ADD    ? {A[31], A} + {B[31], B} :
-                        func == `ADDU   ? A + B :
+                        func == `ADDU   ? daddr :
                         func == `SUB    ? {A[31], A} - {B[31], B} :
                         func == `SUBU   ? A - B :
                         func == `AND    ? {1'b0, A & B} :
