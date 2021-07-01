@@ -14,12 +14,12 @@ module alu(
     output      [31:0]  res                // result
 );
 
-    wire            Cin;
+    wire            Cout;
     wire    [4 :0]  sav     = A[4:0];   // shift amount variable
     
     assign daddr = A+B;
 
-    assign {Cin, res} = func == `ADD    ? {A[31], A} + {B[31], B} :
+    assign {Cout,res} = func == `ADD    ? {A[31], A} + {B[31], B} :
                         func == `ADDU   ? daddr :
                         func == `SUB    ? {A[31], A} - {B[31], B} :
                         func == `SUBU   ? A - B :
@@ -36,8 +36,7 @@ module alu(
                         func == `SRLV   ? {1'b0, B >> sav} :
                         func == `SRAV   ? {1'b0, $signed(B) >>> sav} : 33'b0;  // * modify if other instruction needs
 
-
     // *                         ADD,ADDI          SUB,SUBI
-    assign IntegerOverflow = (func == `ADD || func == `SUB) && Cin != res[31]; //* IntegerOverflow Exception
+    assign IntegerOverflow = (func == `ADD || func == `SUB) && Cout != res[31]; //* IntegerOverflow Exception
 
 endmodule

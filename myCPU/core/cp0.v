@@ -19,16 +19,13 @@ module cp0 (
     input [31:0]    exc_epc,     // * exception pc
     input [31:0]    exc_badvaddr,// * exception BadVAddr
     input           exc_eret,    // * 1: eret
-
+    // * O
     output [31:0]   rdata,  // *read out data
     
     output          ext_int_response,   // *中断响应
-    // output          ext_int_soft,       // *软件中断
     // * cp0 regs
     output [31:0]       cause,
     output [31:0]       status,
-    output [31:0]       index,
-    output reg [2 :0]   config0_k0, // * read and write | reset val : 0x2
     output reg [31:0]   epc         // * read and write | reset val : null
 );
 
@@ -104,7 +101,7 @@ module cp0 (
     // *                31       30                15:10        9:8                 6:2
     assign cause = {Cause_BD, Cause_TI, 14'b0, ip_hardware, ip_software, 1'b0, Cause_ExcCode, 2'b0};
     wire cause_wen = wen && addr == `CP0_Cause;
-    wire [5:0] hardware_int = ext_int/* | {timer_int, 5'b0}*/;
+    wire [5:0] hardware_int = ext_int/* | {timer_int, 5'b0}*/; // * 取消了时钟中断
     always @(posedge clk) begin
         // *BD
         if(!resetn)                         Cause_BD <= 1'b0;
@@ -132,16 +129,16 @@ module cp0 (
     // *                            存在未被屏蔽的中断                 没有例外在处理   中断使能开启
     assign  ext_int_response    = ({hardware_int, ext_int_soft} & Status_IM) && !Status_EXL && Status_IE;
 
-    // * Config0 (16, 0) | read and partially writeable |
-    wire config0_wen = wen && addr == `CP0_Config0;
-    // *                    M            BE    AT    AR    MT
-    wire [31:0] config0 = {1'b1, 15'b0, 1'b0, 2'b0, 3'b0, 3'b1, 4'b0, config0_k0};
+    // // * Config0 (16, 0) | read and partially writeable |
+    // wire config0_wen = wen && addr == `CP0_Config0;
+    // // *                    M            BE    AT    AR    MT
+    // wire [31:0] config0 = {1'b1, 15'b0, 1'b0, 2'b0, 3'b0, 3'b1, 4'b0, config0_k0};
 
-    always @(posedge clk) begin
-        // * config_k0
-        if(!resetn) config0_k0 <= 3'b011;
-        else if(config0_wen) config0_k0 <= wdata[`Config0_k0];
-    end
+    // always @(posedge clk) begin
+    //     // * config_k0
+    //     if(!resetn) config0_k0 <= 3'b011;
+    //     else if(config0_wen) config0_k0 <= wdata[`Config0_k0];
+    // end
 
     // * Config1 (16, 1) | read only
     // TODO: 配置修改
@@ -170,7 +167,7 @@ module cp0 (
             {32{addr == `CP0_Compare    }} & compare    |
             {32{addr == `CP0_Status     }} & status     |
             {32{addr == `CP0_Cause      }} & cause      |
-            {32{addr == `CP0_Config0    }} & config0    |
+            // {32{addr == `CP0_Config0    }} & config0    |
             {32{addr == `CP0_EPC        }} & epc        ;
 
 endmodule

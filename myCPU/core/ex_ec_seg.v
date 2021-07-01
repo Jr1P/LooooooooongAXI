@@ -39,6 +39,7 @@ module ex_ec_seg (
     output reg [31:0]   ec_pc,
     output reg [31:0]   ec_inst,
     output reg [31:0]   ec_res,
+    output reg [31:0]   ec_res1, //* reduce fanout
     output reg [31:0]   ec_B,
     output reg          ec_load,
     output reg          ec_loadX,
@@ -67,6 +68,7 @@ module ex_ec_seg (
             ec_pc       <= 32'b0;
             ec_inst     <= 32'b0;
             ec_res      <= 32'b0;
+            ec_res1     <= 32'b0;
             ec_B        <= 32'b0;
             ec_load     <= 1'b0;
             ec_loadX    <= 1'b0;
@@ -90,6 +92,7 @@ module ex_ec_seg (
             ec_pc       <= ex_pc;
             ec_inst     <= ex_inst;
             ec_res      <= ex_res;
+            ec_res1     <= ex_res;
             ec_B        <= ex_B;
             ec_load     <= ex_load;
             ec_loadX    <= ex_loadX;

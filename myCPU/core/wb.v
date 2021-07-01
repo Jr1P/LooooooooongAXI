@@ -14,10 +14,10 @@ module wb (
     input [1 :0]    wb_hiloren,
     input [31:0]    wb_hilordata,
 
+    output [31:0]   wb_rdata,
     output [31:0]   wb_reorder_data
 );
 
-    wire [31:0] wb_rdata;
     wire [31:0] wb_data_rdata = data_rdata >> {wb_data_addr, 3'b0};
     assign wb_rdata[7 : 0] =    {8{wb_lsV[0]}} & wb_data_rdata[7:0];
     assign wb_rdata[15: 8] =    {8{wb_lsV[1]}} & wb_data_rdata[15:8] |

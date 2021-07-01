@@ -5,9 +5,11 @@ module id_ex_seg (
     input   clk,
     input   resetn,
 
-    input   stall,
-    input   refresh,
+    input       stall,
+    input       refresh,
+    input [1:0] recode,
 
+    // input [1:0]     id_recode,
     input [`EXBITS] id_ex,
 
     input [31:0]    id_pc,
@@ -41,7 +43,7 @@ module id_ex_seg (
     input [1 :0]    id_hilowen,
 
     output reg [`EXBITS]ex_ex,
-    
+    // output reg [1 :0]   ex_recode,
     output reg [31:0]   ex_pc,
     output reg [31:0]   ex_inst,
     output reg          ex_imm,
@@ -74,21 +76,19 @@ module id_ex_seg (
 );
 
     always @(posedge clk) begin
-        if(!resetn || refresh) begin
-            ex_pc           <= 32'h0;
-            ex_inst         <= 32'h0;
-            ex_bd           <= 1'b0;
+        if(recode[0]|recode[1]) begin
+            if(recode[0])
+                ex_B    <= id_B;
+            if(recode[1])
+                ex_A    <= id_A;
+            // ex_recode   <= 2'b0;
         end
-        else if(!stall) begin
-            ex_pc           <= id_pc;
-            ex_inst         <= id_inst;
-            ex_bd           <= id_bd;
-        end
-    end
-
-    always @(posedge clk) begin
-        if(!resetn || refresh) begin
+        else if(!resetn || refresh) begin
             ex_ex       <= `NUM_EX'b0;
+            // ex_recode   <= 2'b0;
+            ex_pc       <= 32'h0;
+            ex_inst     <= 32'h0;
+            ex_bd       <= 1'b0;
             ex_imm      <= 1'b0;
             ex_Imm      <= 32'h0;
             ex_A        <= 32'h0;
@@ -118,6 +118,10 @@ module id_ex_seg (
         end
         else if(!stall) begin
             ex_ex       <= id_ex;
+            // ex_recode   <= id_recode;
+            ex_pc       <= id_pc;
+            ex_inst     <= id_inst;
+            ex_bd       <= id_bd;
             ex_imm      <= id_imm;
             ex_Imm      <= id_Imm;
             ex_A        <= id_A;

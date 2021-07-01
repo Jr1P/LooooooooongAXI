@@ -19,7 +19,7 @@ module mul(
     reg [2:0] cnt;
     always @(posedge clk) begin
         if(!resetn || finish)   cnt <= 3'd0;
-        else if(cancel)         cnt <= 3'd1;
+        if(cancel)              cnt <= 3'd1;
         else if(en || working)  cnt <= cnt + 3'd1;
     end
 
