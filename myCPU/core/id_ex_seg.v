@@ -9,7 +9,6 @@ module id_ex_seg (
     input       refresh,
     input [1:0] recode,
 
-    // input [1:0]     id_recode,
     input [`EXBITS] id_ex,
 
     input [31:0]    id_pc,
@@ -18,6 +17,8 @@ module id_ex_seg (
     input [31:0]    id_Imm,
     input [31:0]    id_A,           // GPR[rs]
     input [31:0]    id_B,           // GPR[rt]
+    input [31:0]    id_reorderA,
+    input [31:0]    id_reorderB,
     input           id_rs_ren,
     input           id_rt_ren,
     input           id_al,
@@ -43,13 +44,15 @@ module id_ex_seg (
     input [1 :0]    id_hilowen,
 
     output reg [`EXBITS]ex_ex,
-    // output reg [1 :0]   ex_recode,
+    output reg [1 :0]   ex_recode,
     output reg [31:0]   ex_pc,
     output reg [31:0]   ex_inst,
     output reg          ex_imm,
     output reg [31:0]   ex_Imm,
     output reg [31:0]   ex_A,
     output reg [31:0]   ex_B,
+    output reg [31:0]   ex_reorderA,
+    output reg [31:0]   ex_reorderB,
     output reg          ex_rs_ren,
     output reg          ex_rt_ren,
     output reg          ex_al,
@@ -81,11 +84,11 @@ module id_ex_seg (
                 ex_B    <= id_B;
             if(recode[1])
                 ex_A    <= id_A;
-            // ex_recode   <= 2'b0;
+            ex_recode   <= recode;
         end
         else if(!resetn || refresh) begin
             ex_ex       <= `NUM_EX'b0;
-            // ex_recode   <= 2'b0;
+            ex_recode   <= 2'b0;
             ex_pc       <= 32'h0;
             ex_inst     <= 32'h0;
             ex_bd       <= 1'b0;
@@ -93,6 +96,8 @@ module id_ex_seg (
             ex_Imm      <= 32'h0;
             ex_A        <= 32'h0;
             ex_B        <= 32'h0;
+            ex_reorderA <= 32'h0;
+            ex_reorderB <= 32'h0;
             ex_rs_ren   <= 1'b0;
             ex_rt_ren   <= 1'b0;
             ex_al       <= 1'b0;
@@ -118,7 +123,7 @@ module id_ex_seg (
         end
         else if(!stall) begin
             ex_ex       <= id_ex;
-            // ex_recode   <= id_recode;
+            ex_recode   <= 2'b0;
             ex_pc       <= id_pc;
             ex_inst     <= id_inst;
             ex_bd       <= id_bd;
@@ -126,6 +131,8 @@ module id_ex_seg (
             ex_Imm      <= id_Imm;
             ex_A        <= id_A;
             ex_B        <= id_B;
+            ex_reorderA <= id_reorderA;
+            ex_reorderB <= id_reorderB;
             ex_rs_ren   <= id_rs_ren;
             ex_rt_ren   <= id_rt_ren;
             ex_al       <= id_al;

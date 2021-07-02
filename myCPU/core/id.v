@@ -196,8 +196,8 @@ module id(
 
     assign SPEC     =   id_inst && opcode == `SPEC && !op_jr && !op_jalr && !op_syscall && !op_break;  // opcode = 0 and not JR,JALR,BREAK,SYSCALL
 
-    assign rs_ren   =   (SPEC && !op_sll && !op_sra && !op_srl) || imm || (branch && !op_j && !op_jal);
-    assign rt_ren   =   SPEC || op_mtc0 || op_beq || op_bne || (|data_wen);
+    assign rs_ren   =   ((SPEC && !op_sll && !op_sra && !op_srl) || imm || (branch && !op_j && !op_jal)) && rscode != 5'h0;
+    assign rt_ren   =   (SPEC || op_mtc0 || op_beq || op_bne || (|data_wen)) && rtcode != 5'h0;
 
     assign load     =   op_lb || op_lh || op_lw || op_lbu || op_lhu;
     assign loadX    =   !op_lbu && !op_lhu;

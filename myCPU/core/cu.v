@@ -42,7 +42,6 @@ module cu(
 
     output [1:0]id_recode,      // * load写后面指令读时使用
     output      pre_ins,
-    // output      inst_stall,
 
     output      if_id_stall,
     output      id_ex_stall,
@@ -71,16 +70,11 @@ module cu(
     wire inst_stall = (inst_req && !inst_addr_ok);
     // * load若addr被接收就不暂停，store需要addr被接收且data写入才能不暂停
     wire data_stall = data_req && !data_addr_ok; // * data cache因addr_ok没返回被暂停
-
-    wire ex_branch_stall = (ex_rel_rs || ex_rel_rt) && (ex_dload_req || ex_cp0ren); // * ex段 数据相关导致分支预测暂停
+                                                // * 注释掉为了去掉ex到id段的分支预测的重定向
+    wire ex_branch_stall = (ex_rel_rs || ex_rel_rt)/* && (ex_dload_req || ex_cp0ren)*/;
     wire ec_branch_stall = (ec_rel_rs || ec_rel_rt) && ec_dload_req && !ex_branch_stall;
-    assign pre_ins = /*(div_mul_stall || data_stall || ec_wb_stall || ex_branch_stall || ec_branch_stall)*/
-                        if_id_stall && !inst_stall;
+    assign pre_ins = if_id_stall && !inst_stall;
 
-    // * ec load ex load
-    // wire load_load      = ex_dload_req && ec_dload_req;
-    // * ec的load已返回data
-    // wire load_load_ok   = load_load && data_data_ok;
     wire ec_load_to_ex_stall = ec_dload_req && (ex_rs_ren && ec_wreg == ex_rs || ex_rt_ren && ec_wreg == ex_rt);
 
     assign id_recode =  {2{(ec_load_to_ex_stall || data_stall) && !ec_wb_stall && wb_regwen}} &

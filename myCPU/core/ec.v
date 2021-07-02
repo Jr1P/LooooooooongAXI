@@ -9,18 +9,15 @@ module ec (
     input [`EXBITS] ec_ex,
     input [31:0]    ec_pc,
     input [31:0]    ec_res,
-    input [31:0]    ec_res1,
-    input           ec_al,
     input           ec_load,
 
     input           ec_cp0ren,
     input           ec_cp0wen,
     input [7 :0]    ec_cp0addr,
     input [31:0]    ec_wdata,
-    input [1 :0]    ec_hiloren,
-    input [31:0]    ec_hilordata,
     input           ec_bd,
     input           ec_eret,
+    input [31:0]    ec_reorder_ex,
     input           wb_eret,
 
     output          exc_oc,
@@ -47,10 +44,7 @@ module ec (
     wire exc_valid =    cp0_status[`Status_EXL] && !wb_eret ? 1'b1 : 
                         (ext_int_response || (|ec_ex));
 
-    assign reorder_data =   ec_cp0ren   ?   cp0rdata        :   //* cp0
-                            ec_hiloren  ?   ec_hilordata    :   //* HI/LO
-                            ec_al       ?   ec_pc+32'd8     :   //* al写GPR[31]
-                                            ec_res1         ;
+    assign reorder_data =   ec_cp0ren ? cp0rdata : ec_reorder_ex;
     wire [31:0] exc_badvaddr = ec_ex[5] ? ec_pc : ec_res; // FIXME: ec_pc可能需要修改，取地址错误的地址不一定是ec_pc
     assign exc_oc = !cp0_status[`Status_EXL] && exc_valid;
     // * CP0 regs

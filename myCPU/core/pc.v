@@ -14,17 +14,16 @@ module pc(
 
     input               eret,           // eret指令
     input       [31:0]  epc,
-    // input               pre_inst,       // 前一条指令
     output reg  [31:0]  npc
 );
 
     always @(posedge clk) begin
-        if(!resetn)     npc <=  `RESET_ADDR;
-        else            npc <=  eret        ?   epc         : 
-                                exc_oc      ?   `EXEC_ADDR  :
-                                stall       ?   npc         :
-                                BranchTake  ?   BranchTarget:
-                                                npc+32'd4   ;
+        if(!resetn)         npc <=  `RESET_ADDR ;
+        else if(eret)       npc <=  epc         ;
+        else if(exc_oc)     npc <=  `EXEC_ADDR  ;
+        else if(stall)                          ;
+        else if(BranchTake) npc <= BranchTarget ;
+        else                npc <= npc+32'd4    ;
     end
 
 endmodule
