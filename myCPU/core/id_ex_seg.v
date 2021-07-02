@@ -7,7 +7,11 @@ module id_ex_seg (
 
     input       stall,
     input       refresh,
-    input [1:0] recode,
+    // input [1:0] recode,
+
+    input           wb_regwen,
+    input [4 :0]    wb_wreg,
+    input [31:0]    wb_reorder_data,
 
     input [`EXBITS] id_ex,
 
@@ -44,7 +48,7 @@ module id_ex_seg (
     input [1 :0]    id_hilowen,
 
     output reg [`EXBITS]ex_ex,
-    output reg [1 :0]   ex_recode,
+    // output reg [1 :0]   ex_recode,
     output reg [31:0]   ex_pc,
     output reg [31:0]   ex_inst,
     output reg          ex_imm,
@@ -79,16 +83,16 @@ module id_ex_seg (
 );
 
     always @(posedge clk) begin
-        if(recode[0]|recode[1]) begin
-            if(recode[0])
-                ex_B    <= id_B;
-            if(recode[1])
-                ex_A    <= id_A;
-            ex_recode   <= recode;
-        end
-        else if(!resetn || refresh) begin
+        // if(recode[0]|recode[1]) begin
+        //     if(recode[0])
+        //         ex_B    <= id_B;
+        //     if(recode[1])
+        //         ex_A    <= id_A;
+        //     ex_recode   <= recode;
+        // end
+        if(!resetn || refresh) begin
             ex_ex       <= `NUM_EX'b0;
-            ex_recode   <= 2'b0;
+            // ex_recode   <= 2'b0;
             ex_pc       <= 32'h0;
             ex_inst     <= 32'h0;
             ex_bd       <= 1'b0;
@@ -123,7 +127,7 @@ module id_ex_seg (
         end
         else if(!stall) begin
             ex_ex       <= id_ex;
-            ex_recode   <= 2'b0;
+            // ex_recode   <= 2'b0;
             ex_pc       <= id_pc;
             ex_inst     <= id_inst;
             ex_bd       <= id_bd;
@@ -155,6 +159,12 @@ module id_ex_seg (
             ex_mdsign   <= id_mdsign;
             ex_hilowen  <= id_hilowen;
             ex_hiloren  <= id_hiloren;
+        end
+        else begin
+            if(wb_regwen && wb_wreg == `GET_Rs(ex_inst))
+                ex_A    <= wb_reorder_data;
+            if(wb_regwen && wb_wreg == `GET_Rt(ex_inst))
+                ex_B    <= wb_reorder_data;
         end
     end
 

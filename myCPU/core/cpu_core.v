@@ -83,7 +83,6 @@ module cpu_core(
     wire [1 :0]     id_hilowen;
     // *EX
     wire [`EXBITS]  ex_ex;
-    wire [1 :0]     ex_recode;
     wire [31:0]     ex_pc;
     wire [31:0]     ex_inst;
     wire [4 :0]     ex_rs = `GET_Rs(ex_inst);
@@ -93,8 +92,6 @@ module cpu_core(
     wire [31:0]     ex_Imm;
     wire [31:0]     ex_A;
     wire [31:0]     ex_B;
-    wire [31:0]     ex_reorderA;
-    wire [31:0]     ex_reorderB;
     wire [31:0]     ex_daddr;
     wire            ex_rs_ren;
     wire            ex_rt_ren;
@@ -168,7 +165,6 @@ module cpu_core(
 
     // * CU
     wire    pre_ins;    // * 是否是要用前一次的指令
-    wire[1:0]id_recode;  // * id_ex重解码
     wire    if_id_stall;
     wire    id_ex_stall;
     wire    ex_ec_stall;
@@ -252,7 +248,6 @@ module cpu_core(
         .div_mul_stall  (div_mul_stall),
         // * O
         .pre_ins    (pre_ins),
-        .id_recode  (id_recode),
 
         .if_id_stall    (if_id_stall),
         .id_ex_stall    (id_ex_stall),
@@ -317,14 +312,12 @@ module cpu_core(
     // *ID   *          exc_oc 后一条以及inst_data_ok低和取指地址错时都是无效指令
     assign id_inst  =   exc_oc_invalid || !inst_data_ok || id_addr_error ? 32'b0 : inst_rdata;
 
-    wire [4:0] regfile_rs = id_recode != 2'b00 ? ex_rs : id_rs;
-    wire [4:0] regfile_rt = id_recode != 2'b00 ? ex_rt : id_rt;  
 
     regfile u_regfile(
         .clk    (aclk),
         .resetn (aresetn),
-        .rs     (regfile_rs),
-        .rt     (regfile_rt),
+        .rs     (id_rs),
+        .rt     (id_rt),
         .wen    (wb_regwen && !ec_wb_stall), // * wb被暂停不写
         .wreg   (wb_wreg),
         .wdata  (wb_reorder_data),
@@ -333,12 +326,9 @@ module cpu_core(
         .outB   (regoutb)
     );
 
-    wire [31:0] re_rs =     // ex_regwen && ex_wreg == id_rs   ? ex_reorder_data   :
-                            ec_regwen && ec_wreg == id_rs   ? ec_reorder_data   : regouta;
-                            
+    wire [31:0] re_rs =     ec_regwen && ec_wreg == id_rs   ? ec_reorder_data   : regouta;           
 
-    wire [31:0] re_rt =     // ex_regwen && ex_wreg == id_rt   ? ex_reorder_data   :
-                            ec_regwen && ec_wreg == id_rt   ? ec_reorder_data   : regoutb;
+    wire [31:0] re_rt =     ec_regwen && ec_wreg == id_rt   ? ec_reorder_data   : regoutb;
 
     id u_id(
         .id_addr_error  (id_addr_error),
@@ -385,7 +375,10 @@ module cpu_core(
 
         .stall  (id_ex_stall),
         .refresh(id_ex_refresh),
-        .recode (id_recode),
+
+        .wb_regwen          (wb_regwen && !ec_wb_stall),
+        .wb_wreg            (wb_wreg),
+        .wb_reorder_data    (wb_reorder_data),
 
         .id_ex      (id_ex),
         .id_pc      (id_pc),
@@ -394,8 +387,6 @@ module cpu_core(
         .id_Imm     (id_Imm),
         .id_A       (regouta),
         .id_B       (regoutb),
-        .id_reorderA(re_rs),
-        .id_reorderB(re_rt),
         .id_rs_ren  (id_rs_ren),
         .id_rt_ren  (id_rt_ren),
         .id_al      (id_al),
@@ -421,15 +412,12 @@ module cpu_core(
         .id_hilowen (id_hilowen),
 
         .ex_ex      (ex_ex),
-        .ex_recode  (ex_recode), 
         .ex_pc      (ex_pc),
         .ex_inst    (ex_inst),
         .ex_imm     (ex_imm),
         .ex_Imm     (ex_Imm),
         .ex_A       (ex_A),
         .ex_B       (ex_B),
-        .ex_reorderA(ex_reorderA),
-        .ex_reorderB(ex_reorderB),
         .ex_rs_ren  (ex_rs_ren),
         .ex_rt_ren  (ex_rt_ren),
         .ex_al      (ex_al),
@@ -457,13 +445,11 @@ module cpu_core(
 
     // *EX
     // *store命令写入的数据
-    assign ex_wdata     =   ex_recode[0]                    ? ex_B              : 
-                            ec_wreg == ex_rt && ec_regwen   ? ec_reorder_data   :
-                            wb_wreg == ex_rt && wb_regwen   ? wb_reorder_data   : ex_reorderB;
+    assign ex_wdata     =   ec_wreg == ex_rt && ec_regwen   ? ec_reorder_data   :
+                            wb_wreg == ex_rt && wb_regwen   ? wb_reorder_data   : ex_B;
 
-    wire [31:0] inAlu1  =   ex_recode[1]                    ? ex_A              :
-                            ec_wreg == ex_rs && ec_regwen   ? ec_reorder_data   :
-                            wb_wreg == ex_rs && wb_regwen   ? wb_reorder_data   : ex_reorderA;
+    wire [31:0] inAlu1  =   ec_wreg == ex_rs && ec_regwen   ? ec_reorder_data   :
+                            wb_wreg == ex_rs && wb_regwen   ? wb_reorder_data   : ex_A;
 
     wire [31:0] inAlu2  =   ex_imm ? ex_Imm : ex_wdata;
 
@@ -605,6 +591,15 @@ module cpu_core(
 
     // *mtc0的写入数据
     assign ec_wdata =   wb_wreg == ex_rt && wb_load ? wb_rdata : ec_B;
+    // * load 
+    wire [31:0] ec_data_rdata = data_rdata >> {ec_res[1:0], 3'b0};
+    wire [31:0] ec_rdata;
+    assign ec_rdata[7 : 0] =    {8{ec_lsV[0]}} & ec_data_rdata[7:0];
+    assign ec_rdata[15: 8] =    {8{ec_lsV[1]}} & ec_data_rdata[15:8] |
+                                {8{!ec_lsV[1] && ec_lsV[0] && ec_loadX && ec_data_rdata[7]}};
+    assign ec_rdata[31:16] =    {16{ec_lsV[2] && ec_lsV[3]}} & ec_data_rdata[31:16]   |
+                                {16{!ec_lsV[2] && !ec_lsV[3] && ec_lsV[1] && ec_loadX && ec_data_rdata[15]}} |
+                                {16{!ec_lsV[2] && !ec_lsV[3] && !ec_lsV[1] && ec_lsV[0] && ec_loadX && ec_data_rdata[7]}};
 
     ec u_ec(
         .ext_int        (ext_int),
@@ -641,13 +636,10 @@ module cpu_core(
         .refresh(ec_wb_refresh),
 
         .ec_data_ok     (data_data_ok),
-        .ec_data_rdata  (data_rdata),
+        .ec_data_rdata  (ec_rdata),
         .ec_pc          (ec_pc),
         .ec_inst        (ec_inst),
         .ec_load        (ec_load),
-        .ec_loadX       (ec_loadX),
-        .ec_lsV         (ec_lsV),
-        .ec_data_addr   (ec_res[1:0]),
         .ec_regwen      (ec_regwen),
         .ec_wreg        (ec_wreg),
         .ec_eret        (ec_eret),
@@ -658,9 +650,6 @@ module cpu_core(
         .wb_pc          (wb_pc),
         .wb_inst        (wb_inst),
         .wb_load        (wb_load),
-        .wb_loadX       (wb_loadX),
-        .wb_lsV         (wb_lsV),
-        .wb_data_addr   (wb_data_addr),
         .wb_regwen      (wb_regwen),
         .wb_wreg        (wb_wreg),
         .wb_eret        (wb_eret),
@@ -671,9 +660,6 @@ module cpu_core(
     wb u_wb(
         .data_rdata     (wb_data_rdata),
         .wb_load        (wb_load),
-        .wb_loadX       (wb_loadX),
-        .wb_lsV         (wb_lsV),
-        .wb_data_addr   (wb_data_addr),
         .wb_reorder_ec  (wb_reorder_ec),
 
         // * O
