@@ -12,6 +12,13 @@ module cp0 (
     input  [7 :0]   addr,   // *write/read address
     input  [31:0]   wdata,  // *write in data
 
+    input           cp0_badV_en,
+    input           cp0_count_en,
+    input           cp0_compare_en,
+    input           cp0_status_en,
+    input           cp0_cause_en,
+    input           cp0_epc_en,
+
     // * exception occur
     input           exc_valid,   // * 1: 例外处理
     input [4 :0]    exc_excode,  // * exception code
@@ -51,7 +58,7 @@ module cp0 (
     // *Count (9, 0) | read/write | reset val: null
     reg [31:0] count;
     reg inter_tik;
-    wire count_wen = wen && addr == `CP0_Count;
+    wire count_wen = wen && cp0_count_en;
     always @(posedge clk) begin
         if(!resetn) inter_tik <= 1'b0;
         else        inter_tik <= ~inter_tik;
@@ -61,7 +68,7 @@ module cp0 (
 
     // *Compare (11, 0) | read/write | reset val: null
     reg [31:0] compare;
-    wire compare_wen = wen && addr == `CP0_Compare;
+    wire compare_wen = wen && cp0_compare_en;
     always @(posedge clk) begin
         if(compare_wen) compare <= wdata;
     end
@@ -77,7 +84,7 @@ module cp0 (
     reg [7:0] Status_IM;        // *read/write  | reset val: null
     // *                       22               15:8              1          0
     assign status = {9'b0, Status_Bev, 6'b0, Status_IM, 6'b0, Status_EXL, Status_IE};
-    wire status_wen = wen && addr == `CP0_Status;
+    wire status_wen = wen && cp0_status_en;
     always @(posedge clk) begin
         // * Bev
         if(!resetn)         Status_Bev <= 1'b1;
@@ -100,7 +107,7 @@ module cp0 (
     reg [4:0] Cause_ExcCode;
     // *                31       30                15:10        9:8                 6:2
     assign cause = {Cause_BD, Cause_TI, 14'b0, ip_hardware, ip_software, 1'b0, Cause_ExcCode, 2'b0};
-    wire cause_wen = wen && addr == `CP0_Cause;
+    wire cause_wen = wen && cp0_cause_en;
     wire [5:0] hardware_int = ext_int/* | {timer_int, 5'b0}*/; // * 取消了时钟中断
     always @(posedge clk) begin
         // *BD
@@ -120,7 +127,7 @@ module cp0 (
     end
 
     // * EPC (14, 0) | read/write | reset val: null
-    wire epc_wen = wen && addr == `CP0_EPC;
+    wire epc_wen = wen && cp0_epc_en;
     always @(posedge clk) begin
         if(epc_wen)                         epc <= wdata;
         else if(exc_valid && !Status_EXL)   epc <= exc_epc;  // *exc_epc: if Cause.BD is 1, exc_epc == pc-4
@@ -161,13 +168,11 @@ module cp0 (
     };
 
     assign rdata = 
-            // {32{addr == `CP0_Index      }} & index      |
-            {32{addr == `CP0_BadVAddr   }} & badvaddr   |
-            {32{addr == `CP0_Count      }} & count      |
-            {32{addr == `CP0_Compare    }} & compare    |
-            {32{addr == `CP0_Status     }} & status     |
-            {32{addr == `CP0_Cause      }} & cause      |
-            // {32{addr == `CP0_Config0    }} & config0    |
-            {32{addr == `CP0_EPC        }} & epc        ;
+            {32{cp0_badV_en     }} & badvaddr   |
+            {32{cp0_count_en    }} & count      |
+            {32{cp0_compare_en  }} & compare    |
+            {32{cp0_status_en   }} & status     |
+            {32{cp0_cause_en    }} & cause      |
+            {32{cp0_epc_en      }} & epc        ;
 
 endmodule

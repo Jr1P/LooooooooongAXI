@@ -32,6 +32,13 @@ module ex_ec_seg (
     input           ex_cp0ren,
     input [31:0]    ex_reorder_data,
 
+    input           ex_cp0_badV_en,
+    input           ex_cp0_count_en,
+    input           ex_cp0_compare_en,
+    input           ex_cp0_status_en,
+    input           ex_cp0_cause_en,
+    input           ex_cp0_epc_en,
+
     output reg [`EXBITS]ec_ex,
     output reg [31:0]   ec_pc,
     output reg [31:0]   ec_inst,
@@ -52,7 +59,14 @@ module ex_ec_seg (
     output reg          ec_cp0wen,
     output reg [`CP0ADDR] ec_cp0addr,
     output reg          ec_cp0ren,
-    output reg [31:0]   ec_reorder_ex // * 从ex段传来的reorder data
+    output reg [31:0]   ec_reorder_ex, // * 从ex段传来的reorder data
+
+    output reg          ec_cp0_badV_en,
+    output reg          ec_cp0_count_en,
+    output reg          ec_cp0_compare_en,
+    output reg          ec_cp0_status_en,
+    output reg          ec_cp0_cause_en,
+    output reg          ec_cp0_epc_en
 );
 
     always @(posedge clk) begin
@@ -75,6 +89,13 @@ module ex_ec_seg (
             ec_cp0addr      <= 8'b0;
             ec_cp0ren       <= 1'b0;
             ec_reorder_ex   <= 32'h0;
+
+            ec_cp0_badV_en      <= 1'b0;
+            ec_cp0_count_en     <= 1'b0;
+            ec_cp0_compare_en   <= 1'b0;
+            ec_cp0_status_en    <= 1'b0;
+            ec_cp0_cause_en     <= 1'b0;
+            ec_cp0_epc_en       <= 1'b0;
         end
         else if(!stall) begin
             ec_ex           <= ex_ex;
@@ -95,6 +116,13 @@ module ex_ec_seg (
             ec_cp0addr      <= ex_cp0addr;
             ec_cp0ren       <= ex_cp0ren;
             ec_reorder_ex   <= ex_reorder_data;
+
+            ec_cp0_badV_en      <= ex_cp0_badV_en;
+            ec_cp0_count_en     <= ex_cp0_count_en;
+            ec_cp0_compare_en   <= ex_cp0_compare_en;
+            ec_cp0_status_en    <= ex_cp0_status_en;
+            ec_cp0_cause_en     <= ex_cp0_cause_en;
+            ec_cp0_epc_en       <= ex_cp0_epc_en;
         end
     end
 

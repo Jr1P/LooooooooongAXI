@@ -13,10 +13,18 @@ module ec (
 
     input           ec_cp0ren,
     input           ec_cp0wen,
-    input [7 :0]    ec_cp0addr,
+    // input [7 :0]    ec_cp0addr,
     input [31:0]    ec_wdata,
     input           ec_bd,
     input           ec_eret,
+
+    input           ec_cp0_badV_en,
+    input           ec_cp0_count_en,
+    input           ec_cp0_compare_en,
+    input           ec_cp0_status_en,
+    input           ec_cp0_cause_en,
+    input           ec_cp0_epc_en,
+
     input [31:0]    ec_reorder_ex,
     input           wb_eret,
 
@@ -55,8 +63,15 @@ module ec (
         .ext_int(ext_int),
 
         .wen    (ec_cp0wen),
-        .addr   (ec_cp0addr),
+        // .addr   (ec_cp0addr),
         .wdata  (ec_wdata),
+
+        .cp0_badV_en    (ec_cp0_badV_en),
+        .cp0_count_en   (ec_cp0_count_en),
+        .cp0_compare_en (ec_cp0_compare_en),
+        .cp0_status_en  (ec_cp0_status_en),
+        .cp0_cause_en   (ec_cp0_cause_en),
+        .cp0_epc_en     (ec_cp0_epc_en),
 
         .exc_valid      (exc_valid),
         .exc_excode     (exc_excode),

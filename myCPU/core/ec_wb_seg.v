@@ -7,7 +7,6 @@ module ec_wb_seg (
     input   stall,
     input   refresh,
 
-    input           ec_data_ok,
     input [31:0]    ec_data_rdata,
     input [31:0]    ec_pc,
     input [31:0]    ec_inst,
@@ -20,7 +19,6 @@ module ec_wb_seg (
     input           ec_eret,
     input [31:0]    ec_reorder_data,
 
-    output reg          wb_data_ok,
     output reg [31:0]   wb_data_rdata,
     output reg [31:0]   wb_pc,
     output reg [31:0]   wb_inst,
@@ -35,7 +33,6 @@ module ec_wb_seg (
 
     always @(posedge clk) begin
         if(!resetn || refresh) begin
-            wb_data_ok      <= 1'b0;
             wb_data_rdata   <= 32'b0;
             wb_pc           <= 32'b0;
             wb_inst         <= 32'b0;
@@ -46,7 +43,6 @@ module ec_wb_seg (
             wb_reorder_ec   <= 32'h0;
         end
         else if(!stall) begin
-            wb_data_ok      <= ec_data_ok;
             wb_data_rdata   <= ec_data_rdata;
             wb_pc           <= ec_pc;
             wb_inst         <= ec_inst;

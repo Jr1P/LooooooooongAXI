@@ -18,8 +18,8 @@
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
-`include "../Head_Files/Parameter.vh"
-`include "../Head_Files/Cache.vh"
+`include "../include/Parameter.vh"
+`include "../include/Cache.vh"
 `define B2 2
 `define B1 1
 `define B0 0

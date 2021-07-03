@@ -71,6 +71,7 @@ module cpu_core(
     wire            id_data_en;
     wire [3 :0]     id_data_ren;
     wire [3 :0]     id_data_wen;
+    wire [3 :0]     id_data_wren; // write | read
     wire            id_regwen;
     wire [4 :0]     id_wreg;
     wire            id_cp0ren;
@@ -81,6 +82,9 @@ module cpu_core(
     wire            id_mdsign;
     wire [1 :0]     id_hiloren;
     wire [1 :0]     id_hilowen;
+    // * branch
+    wire            b_rs_ren;
+    wire            b_rt_ren;
     // *EX
     wire [`EXBITS]  ex_ex;
     wire [31:0]     ex_pc;
@@ -107,6 +111,7 @@ module cpu_core(
     wire            ex_data_en;
     wire [3 :0]     ex_data_ren;
     wire [3 :0]     ex_data_wen;
+    wire [3 :0]     ex_data_wren;
     wire [31:0]     ex_wdata;
     wire            ex_eret;
     wire            ex_cp0ren;
@@ -122,7 +127,6 @@ module cpu_core(
     wire [`EXBITS]  ec_ex;
     wire [31:0]     ec_pc;
     wire [31:0]     ec_inst;
-    wire [4 :0]     ec_rs = `GET_Rs(ec_inst);
     wire [4 :0]     ec_rt = `GET_Rt(ec_inst);
     wire [31:0]     ec_res;
     wire [31:0]     ec_B;
@@ -136,27 +140,28 @@ module cpu_core(
     wire            ec_data_req;
     wire [31:0]     ec_wdata;
     wire            ec_eret;
-    wire            ec_cp0ren;
     wire            ec_exc_oc;
+    wire            ec_cp0ren;
     wire            ec_cp0wen;
     wire [`CP0ADDR] ec_cp0addr;
     wire [31:0]     ec_cp0rdata;
     wire [31:0]     ec_reorder_data;
     wire [31:0]     ec_reorder_ex;
+    wire ec_cp0_badV_en     ;
+    wire ec_cp0_count_en    ;
+    wire ec_cp0_compare_en  ;
+    wire ec_cp0_status_en   ;
+    wire ec_cp0_cause_en    ;
+    wire ec_cp0_epc_en      ;
     // * CP0
     wire [31:0]     cp0_epc;
     wire            ext_int_response;
     // *WB
-    wire            wb_data_ok;
     wire [31:0]     wb_data_rdata;
     wire [31:0]     wb_pc;
     wire [31:0]     wb_inst;
-    wire [31:0]     wb_res;
     wire            wb_load;
-    wire            wb_loadX;
-    wire [31:0]     wb_rdata;
-    wire [3 :0]     wb_lsV;
-    wire [1 :0]     wb_data_addr;
+    // wire [31:0]     wb_rdata;
     wire            wb_regwen;
     wire [4 :0]     wb_wreg;
     wire            wb_eret;
@@ -222,7 +227,6 @@ module cpu_core(
         .data_data_ok   (data_data_ok),
         .wb_regwen      (wb_regwen),
         .wb_wreg        (wb_wreg),
-        .wb_data_ok     (wb_data_ok),
 
         .ex_rs_ren  (ex_rs_ren),
         .ex_rs      (ex_rs),
@@ -232,10 +236,9 @@ module cpu_core(
         .exc_oc     (ec_exc_oc),
         .eret       (id_eret),
 
-        .id_branch  (id_branch),
-        .id_rs_ren  (id_rs_ren),
+        .b_rs_ren   (b_rs_ren),
         .id_rs      (id_rs),
-        .id_rt_ren  (id_rt_ren),
+        .b_rt_ren   (b_rt_ren),
         .id_rt      (id_rt),
 
         .ex_dload_req   (ex_load && data_req), // * load请求
@@ -288,7 +291,7 @@ module cpu_core(
     reg exc_oc_invalid; // * 异常发生后紧接着取出的指令不是正确指令
     always @(posedge aclk) begin
         if(!aresetn)    exc_oc_invalid <=   1'b0;
-        else            exc_oc_invalid <=   ec_exc_oc || (exc_oc_invalid && (if_id_stall || if_id_refresh));
+        else            exc_oc_invalid <=   ec_exc_oc || (exc_oc_invalid && if_id_stall);
     end
 
     if_id_seg u_if_id_seg(
@@ -309,7 +312,7 @@ module cpu_core(
         .id_inst_req    (id_inst_req)
     );
 
-    // *ID   *          exc_oc 后一条以及inst_data_ok低和取指地址错时都是无效指令
+     // *ID   *          exc_oc 后一条以及inst_data_ok低和取指地址错时都是无效指令
     assign id_inst  =   exc_oc_invalid || !inst_data_ok || id_addr_error ? 32'b0 : inst_rdata;
 
 
@@ -345,6 +348,8 @@ module cpu_core(
         .SPEC       (id_SPEC),
         .rs_ren     (id_rs_ren),
         .rt_ren     (id_rt_ren),
+        .b_rs_ren   (b_rs_ren),
+        .b_rt_ren   (b_rt_ren),
         .load       (id_load),
         .loadX      (id_loadX),
         .lsV        (id_lsV),
@@ -360,6 +365,7 @@ module cpu_core(
         .data_en    (id_data_en),
         .data_ren   (id_data_ren),
         .data_wen   (id_data_wen),
+        .data_wren  (id_data_wren),
         .cp0ren     (id_cp0ren),
         .cp0wen     (id_cp0wen),
         .cp0addr    (id_cp0addr),
@@ -401,6 +407,7 @@ module cpu_core(
         .id_data_en (id_data_en),
         .id_data_ren(id_data_ren),
         .id_data_wen(id_data_wen),
+        .id_data_wren(id_data_wren),
         .id_eret    (id_eret),
         .id_cp0ren  (id_cp0ren),
         .id_cp0wen  (id_cp0wen),
@@ -432,6 +439,7 @@ module cpu_core(
         .ex_data_en (ex_data_en),
         .ex_data_ren(ex_data_ren),
         .ex_data_wen(ex_data_wen),
+        .ex_data_wren(ex_data_wren),
         .ex_eret    (ex_eret),
         .ex_cp0ren  (ex_cp0ren),
         .ex_cp0wen  (ex_cp0wen),
@@ -530,10 +538,10 @@ module cpu_core(
     assign data_addr    = ex_daddr & 32'h1fff_ffff;
     assign data_wr      = |ex_data_wen;
     assign data_size    = ex_lsV[3] ? 2'b10 : {1'b0, ex_lsV[1]};
-    assign ex_data_ADDRESS_ERROR = !(ec_data_req && ec_load) && ex_data_en && (ex_load && (ex_data_ren == 4'b0011 && data_addr[0] || ex_data_ren == 4'b1111 && data_addr[1:0] != 2'b00)
-                                    || !ex_load && (ex_data_wen == 4'b0011 && data_addr[0] || ex_data_wen == 4'b1111 && data_addr[1:0] != 2'b00));
+    assign ex_data_ADDRESS_ERROR =  !(ec_data_req && ec_load) && ex_data_en &&
+                                    (ex_data_wren == 4'b0011 && data_addr[0] || ex_data_wren == 4'b1111 && data_addr[1:0] != 2'b00);
 
-    wire [`EXBITS] EX_ex = ex_ex | {2'b0, ex_IntegerOverflow, 2'b0, ex_data_ADDRESS_ERROR};
+    wire [`EXBITS] EX_ex = {ex_ex[5:4], ex_IntegerOverflow, ex_ex[2:1], ex_data_ADDRESS_ERROR};
     assign data_req = ex_data_en && !(|EX_ex) && !ec_exc_oc;
 
     // * 重定向一致 ex_wdata, data_wdata
@@ -542,6 +550,14 @@ module cpu_core(
                             {8{ex_lsV[1]}} & ex_wdata[15: 8],
                             {8{ex_lsV[0]}} & ex_wdata[7 : 0]} << {data_addr[1:0], 3'b0};
     assign data_wstrb = ex_data_wen << data_addr[1:0];
+
+    // * cp0 addr compare here
+    wire ex_cp0_badV_en        = ex_cp0addr == `CP0_BadVAddr;
+    wire ex_cp0_count_en       = ex_cp0addr == `CP0_Count;
+    wire ex_cp0_compare_en     = ex_cp0addr == `CP0_Compare;
+    wire ex_cp0_status_en      = ex_cp0addr == `CP0_Status;
+    wire ex_cp0_cause_en       = ex_cp0addr == `CP0_Cause;
+    wire ex_cp0_epc_en         = ex_cp0addr == `CP0_EPC;
 
     ex_ec_seg u_ex_ec_seg(
         .clk    (aclk),
@@ -569,6 +585,14 @@ module cpu_core(
         .ex_cp0ren      (ex_cp0ren),
         .ex_reorder_data(ex_reorder_data),
 
+        .ex_cp0_badV_en     (ex_cp0_badV_en),
+        .ex_cp0_count_en    (ex_cp0_count_en),
+        .ex_cp0_compare_en  (ex_cp0_compare_en),
+        .ex_cp0_status_en   (ex_cp0_status_en),
+        .ex_cp0_cause_en    (ex_cp0_cause_en),
+        .ex_cp0_epc_en      (ex_cp0_epc_en),
+
+        // * O
         .ec_ex          (ec_ex),
         .ec_pc          (ec_pc),
         .ec_inst        (ec_inst),
@@ -586,11 +610,19 @@ module cpu_core(
         .ec_cp0wen      (ec_cp0wen),
         .ec_cp0addr     (ec_cp0addr),
         .ec_cp0ren      (ec_cp0ren),
-        .ec_reorder_ex  (ec_reorder_ex)
+        .ec_reorder_ex  (ec_reorder_ex),
+
+        .ec_cp0_badV_en     (ec_cp0_badV_en),
+        .ec_cp0_count_en    (ec_cp0_count_en),
+        .ec_cp0_compare_en  (ec_cp0_compare_en),
+        .ec_cp0_status_en   (ec_cp0_status_en),
+        .ec_cp0_cause_en    (ec_cp0_cause_en),
+        .ec_cp0_epc_en      (ec_cp0_epc_en)
     );
 
+    // *EC
     // *mtc0的写入数据
-    assign ec_wdata =   wb_wreg == ex_rt && wb_load ? wb_rdata : ec_B;
+    assign ec_wdata =   wb_wreg == ec_rt && wb_load ? wb_data_rdata : ec_B;
     // * load 
     wire [31:0] ec_data_rdata = data_rdata >> {ec_res[1:0], 3'b0};
     wire [31:0] ec_rdata;
@@ -612,10 +644,18 @@ module cpu_core(
         .ec_load        (ec_load),
         .ec_cp0ren      (ec_cp0ren),
         .ec_cp0wen      (ec_cp0wen),
-        .ec_cp0addr     (ec_cp0addr),
+        // .ec_cp0addr     (ec_cp0addr),
         .ec_wdata       (ec_wdata),
         .ec_bd          (ec_bd),
         .ec_eret        (ec_eret),
+
+        .ec_cp0_badV_en     (ec_cp0_badV_en),
+        .ec_cp0_count_en    (ec_cp0_count_en),
+        .ec_cp0_compare_en  (ec_cp0_compare_en),
+        .ec_cp0_status_en   (ec_cp0_status_en),
+        .ec_cp0_cause_en    (ec_cp0_cause_en),
+        .ec_cp0_epc_en      (ec_cp0_epc_en),
+
         .ec_reorder_ex  (ec_reorder_ex),
         .wb_eret        (wb_eret),
 
@@ -635,7 +675,6 @@ module cpu_core(
         .stall  (ec_wb_stall),
         .refresh(ec_wb_refresh),
 
-        .ec_data_ok     (data_data_ok),
         .ec_data_rdata  (ec_rdata),
         .ec_pc          (ec_pc),
         .ec_inst        (ec_inst),
@@ -645,7 +684,6 @@ module cpu_core(
         .ec_eret        (ec_eret),
         .ec_reorder_data(ec_reorder_data),
 
-        .wb_data_ok     (wb_data_ok),
         .wb_data_rdata  (wb_data_rdata),
         .wb_pc          (wb_pc),
         .wb_inst        (wb_inst),
@@ -663,7 +701,6 @@ module cpu_core(
         .wb_reorder_ec  (wb_reorder_ec),
 
         // * O
-        .wb_rdata       (wb_rdata),
         .wb_reorder_data(wb_reorder_data)
     );
 

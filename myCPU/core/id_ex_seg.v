@@ -7,7 +7,6 @@ module id_ex_seg (
 
     input       stall,
     input       refresh,
-    // input [1:0] recode,
 
     input           wb_regwen,
     input [4 :0]    wb_wreg,
@@ -37,6 +36,7 @@ module id_ex_seg (
     input           id_data_en,
     input [3 :0]    id_data_ren,
     input [3 :0]    id_data_wen,
+    input [3 :0]    id_data_wren,
     input           id_eret,
     input           id_cp0ren,
     input           id_cp0wen,
@@ -48,7 +48,6 @@ module id_ex_seg (
     input [1 :0]    id_hilowen,
 
     output reg [`EXBITS]ex_ex,
-    // output reg [1 :0]   ex_recode,
     output reg [31:0]   ex_pc,
     output reg [31:0]   ex_inst,
     output reg          ex_imm,
@@ -71,6 +70,7 @@ module id_ex_seg (
     output reg          ex_data_en,
     output reg [3 :0]   ex_data_ren,
     output reg [3 :0]   ex_data_wen,
+    output reg [3 :0]   ex_data_wren,
     output reg          ex_eret,
     output reg          ex_cp0ren,
     output reg          ex_cp0wen,
@@ -83,16 +83,8 @@ module id_ex_seg (
 );
 
     always @(posedge clk) begin
-        // if(recode[0]|recode[1]) begin
-        //     if(recode[0])
-        //         ex_B    <= id_B;
-        //     if(recode[1])
-        //         ex_A    <= id_A;
-        //     ex_recode   <= recode;
-        // end
         if(!resetn || refresh) begin
             ex_ex       <= `NUM_EX'b0;
-            // ex_recode   <= 2'b0;
             ex_pc       <= 32'h0;
             ex_inst     <= 32'h0;
             ex_bd       <= 1'b0;
@@ -115,6 +107,7 @@ module id_ex_seg (
             ex_data_en  <= 1'b0;
             ex_data_ren <= 4'b0;
             ex_data_wen <= 4'h0;
+            ex_data_wren<= 4'h0;
             ex_eret     <= 1'b0;
             ex_cp0ren   <= 1'b0;
             ex_cp0wen   <= 1'b0;
@@ -127,7 +120,6 @@ module id_ex_seg (
         end
         else if(!stall) begin
             ex_ex       <= id_ex;
-            // ex_recode   <= 2'b0;
             ex_pc       <= id_pc;
             ex_inst     <= id_inst;
             ex_bd       <= id_bd;
@@ -150,6 +142,7 @@ module id_ex_seg (
             ex_data_en  <= id_data_en;
             ex_data_ren <= id_data_ren;
             ex_data_wen <= id_data_wen;
+            ex_data_wren<= id_data_wren;
             ex_eret     <= id_eret;
             ex_cp0ren   <= id_cp0ren;
             ex_cp0wen   <= id_cp0wen;

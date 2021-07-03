@@ -15,7 +15,6 @@ module cu(
     input       data_data_ok,
     input       wb_regwen,
     input [4:0] wb_wreg,
-    input       wb_data_ok,
 
     input       ex_rs_ren,
     input [4:0] ex_rs,
@@ -25,10 +24,9 @@ module cu(
     input       exc_oc,
     input       eret,
 
-    input       id_branch,
-    input       id_rs_ren,    // * rs的读有效位
+    input       b_rs_ren,    // * rs的读有效位
     input [4:0] id_rs,
-    input       id_rt_ren,    // * rt的读有效位
+    input       b_rt_ren,    // * rt的读有效位
     input [4:0] id_rt,
 
     input       ex_dload_req,
@@ -40,7 +38,6 @@ module cu(
 
     input       div_mul_stall,
 
-    // output [1:0]id_recode,      // * load写后面指令读时使用
     output      pre_ins,
 
     output      if_id_stall,
@@ -54,17 +51,12 @@ module cu(
     output      ec_wb_refresh
 );
 
-    // * 对于cp0rdata, branch指令需要暂停一个周期
-    // * 对于data load, branch指令需要暂停两个周期
-
     // * 判断ex段写的reg是否为当前id段的rs load, cp0需暂停
-    wire b_rs = id_branch && id_rs_ren; // * 跳转指令读rs
-    wire b_rt = id_branch && id_rt_ren; // * 跳转指令读rt
-    wire ex_rel_rs  = b_rs && ex_wreg == id_rs;
-    wire ex_rel_rt  = b_rt && ex_wreg == id_rt;
+    wire ex_rel_rs  = b_rs_ren && ex_wreg == id_rs;
+    wire ex_rel_rt  = b_rt_ren && ex_wreg == id_rt;
     // * 判断ec段写的reg是否为id段的rs load 需暂停
-    wire ec_rel_rs  = b_rs && ec_wreg == id_rs;
-    wire ec_rel_rt  = b_rt && ec_wreg == id_rt;
+    wire ec_rel_rs  = b_rs_ren && ec_wreg == id_rs;
+    wire ec_rel_rt  = b_rt_ren && ec_wreg == id_rt;
 
     // * inst cache因addr_ok没返回或者数据没返回而暂停
     wire inst_stall = inst_req && !inst_addr_ok;
@@ -72,11 +64,12 @@ module cu(
     wire data_stall = data_req && !data_addr_ok; // * data cache因addr_ok没返回被暂停
                                                 // * 注释掉为了去掉ex到id段的分支预测的重定向
     wire ex_branch_stall = ex_rel_rs || ex_rel_rt;
-    wire ec_branch_stall = (ec_rel_rs || ec_rel_rt) && ec_dload_req && !ex_branch_stall;
-    assign pre_ins = if_id_stall && !inst_stall;
+    wire ec_branch_stall = (ec_rel_rs || ec_rel_rt) && ec_dload_req;
 
     wire ec_load_to_ex_stall = ec_dload_req && (ex_rs_ren && ec_wreg == ex_rs || ex_rt_ren && ec_wreg == ex_rt);
 
+    // * if_id_stall && !inst_stall
+    assign pre_ins = ex_branch_stall || ec_branch_stall || (id_inst_req && !inst_data_ok) || (id_ex_stall && id_pc);
     // * 没返回时持续将data_req挂高
     // *                 ec是load但没返回data_ok
     assign ec_wb_stall = ec_dload_req && !data_data_ok;

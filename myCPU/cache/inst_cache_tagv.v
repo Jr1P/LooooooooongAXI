@@ -18,8 +18,8 @@
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
-`include "../Head_Files/Parameter.vh"
-`include "../Head_Files/Cache.vh"
+`include "../include/Parameter.vh"
+`include "../include/Cache.vh"
 
 module inst_cache_tagv(
     //Input

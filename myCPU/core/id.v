@@ -34,13 +34,14 @@ module id(
     output          SPEC,           // 1: opcode is SPEC, 0: non-SPEC
     output          rs_ren,         // 1: read rs
     output          rt_ren,         // 1: read rt
+    output          b_rs_ren,       // branch read rs
+    output          b_rt_ren,       // branch read rt
     output          load,           // 1: load data from data mem, 0:not
     output          loadX,          // valid when load is 1, 1: signed extend data loaded from data mem, 0: zero extend
     output  [3 :0]  lsV,            // load store vaild, lsV[i] = 1 means the i-th Byte from data mem(or into data mem) is valid
     output          imm,            // 1: with immediate, 0: not
     output  [31:0]  Imm,            // number of Immediate
-    // output  [1 :0]  immXtype,       // valid when imm is 1. 0: zero extend
-                                        // 1: signed extend, 2: {imm, {16{0}}}
+
     output          regwen,         // write en on GPRs, 1: write GPR[wreg], 0: not write
     output  [4 :0]  wreg,           // vaild when regwen is 1
     // * HI LO
@@ -53,6 +54,7 @@ module id(
     output          data_en,        // data active en
     output  [3 :0]  data_ren,       // 4'b0001: load byte, 4'b0011: load half word, 4'b1111: load word
     output  [3 :0]  data_wen,       // data write en
+    output  [3 :0]  data_wren,
     // * cp0
     output          cp0ren,         // 1: read cp0 at cp0regs[cp0addr]
     output          cp0wen,         // 1: write cp0 at cp0regs[cp0addr]
@@ -170,21 +172,29 @@ module id(
     wire op_sw      = op_d[43];
     wire op_cache   = op_d[47];
 
-    // * 跳转相关
-    assign branch   =   (opcode >= `J && opcode <= `BGTZ) || op_jalr || op_jr || op_bltz || op_bgez || op_bltzal || op_bgezal;
+    wire eq = rega == regb;
+    wire j_dir  = op_j || op_jal; // 直接跳转
+    wire j_r    = op_jr || op_jalr; // 使用寄存器
 
-    assign target   =   op_j    || op_jal   ? JTarget   :
-                        op_jr   || op_jalr  ? JRTarget  : BranchTarget;
+    // * 跳转相关
+    assign branch   =   j_dir || j_r || op_beq || op_bne || op_blez || op_bgtz || op_bltz || op_bgez || op_bltzal || op_bgezal;
+
+    assign target   =   {32{!j_dir && !j_r}}    & BranchTarget  |
+                        {32{j_dir}}             & JTarget       |
+                        {32{j_r}}               & JRTarget      ;
 
     assign al       =   op_jal || op_jalr || op_bltzal || op_bgezal;
 
-    assign jump     =   (op_j || op_jal || op_jalr || op_jr) || // * j
-                        (op_beq && rega == regb) || // *beq
-                        (op_bne && rega != regb) || // *bne
-                        (op_blez && (rega[31] || rega == 0)) || // *blez
+    assign jump     =   (eq && op_beq) || // *beq
+                        (!eq && op_bne) || // *bne
+                        ((rega[31] || rega == 0) && op_blez) || // *blez
                         (op_bgtz && (!rega[31] && rega != 0)) || // *bgtz
                         ((op_bltz || op_bltzal) && rega[31]) || // * bltz bltzal
-                        ((op_bgez || op_bgezal) && !rega[31]); // * bgez bgezal
+                        ((op_bgez || op_bgezal) && !rega[31]) || // * bgez bgezal
+                        (j_dir || j_r); // * j
+
+    assign b_rs_ren =   rscode != 5'h0 && (op_beq || op_bne || op_blez || op_bgtz || op_bltz || op_bltzal || op_bgez || op_bgezal || op_jr || op_jalr);
+    assign b_rt_ren =   rtcode != 5'h0 && (op_beq || op_bne);
 
     // * 
     assign func     =   op_addi ? `ADD  :
@@ -194,19 +204,20 @@ module id(
                         op_ori  ? `OR   :
                         op_xori ? `XOR  : `ADDU;
 
+    // spec use func of inst
     assign SPEC     =   id_inst && opcode == `SPEC && !op_jr && !op_jalr && !op_syscall && !op_break;  // opcode = 0 and not JR,JALR,BREAK,SYSCALL
 
-    assign rs_ren   =   ((SPEC && !op_sll && !op_sra && !op_srl) || imm || (branch && !op_j && !op_jal)) && rscode != 5'h0;
-    assign rt_ren   =   (SPEC || op_mtc0 || op_beq || op_bne || (|data_wen)) && rtcode != 5'h0;
+    assign rs_ren   =   rscode != 5'h0 && ((SPEC && !op_sll && !op_sra && !op_srl) || imm || (branch && !j_dir));
+    assign rt_ren   =   rtcode != 5'h0 && (SPEC || op_mtc0 || op_beq || op_bne || (|data_wen));
 
     assign load     =   op_lb || op_lh || op_lw || op_lbu || op_lhu;
     assign loadX    =   !op_lbu && !op_lhu;
     assign lsV      =   {3'b000, op_lb || op_lbu || op_sb} | {2'b00, {2{op_lh || op_lhu || op_sh}}} | {4{op_lw || op_sw}};
 
-    assign imm      =   (opcode >= `ADDI && opcode <= `LUI) || data_en;
+    assign imm      =   op_addi || op_addiu || op_slti || op_sltiu || op_andi || op_ori || op_xori || op_lui || data_en;
 
     wire[1:0] Xtype =   op_lui ? 2'b11:                                 // {imm, 16{0}}
-                        opcode >= `ANDI && opcode <= `XORI ? 2'b00 :    // zero extend
+                        op_andi || op_ori || op_xori ? 2'b00 :          // zero extend
                         2'b01;                                          // signed ex
 
     assign Imm      =   Xtype == 2'b00 ? {16'b0, `GET_Imm(id_inst)}           :   // zero extend
@@ -226,6 +237,7 @@ module id(
                         op_lw           ? 4'b1111 : 4'b0;
 
     assign data_wen =   {3'b000, op_sb} | {2'b00, {2{op_sh}}} | {4{op_sw}};
+    assign data_wren=   data_wen | data_ren;
 
     assign mult     =   op_mult || op_multu;
     assign div      =   op_div || op_divu;
