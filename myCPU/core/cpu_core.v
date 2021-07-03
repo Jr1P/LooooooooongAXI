@@ -1,7 +1,9 @@
 `timescale 1ns / 1ps
 `include "./head.vh"
 
-// * four segment pipeline cpu
+// * five segment pipeline cpu
+
+// TODO: 1. branch  2. add if2 seg   3. TLB inst   4. interrupt mech    5. maybe 反思
 module cpu_core(
     input   [5 :0]  ext_int,        // *硬件中断
 
@@ -43,7 +45,18 @@ module cpu_core(
     wire    ex_data_ADDRESS_ERROR;
     // * IF
     wire [31:0]     npc;
+    wire            if_btb_hit;
+    wire [31:0]     if_btb_target;
+    wire [`BTB_BITS]if_btb_index;
+    wire [`GHR_BITS]if_gshare_index;
+    wire            if_gshare_take;
     // *ID
+    wire            id_btb_hit;
+    wire [31:0]     id_btb_target;
+    wire [`BTB_BITS]id_btb_index;
+    wire            id_gshare_take;
+    wire [`GHR_BITS]id_gshare_index;
+
     wire [31:0]     regouta, regoutb;
     wire            id_addr_error;
     wire [`EXBITS]  id_ex;
@@ -147,6 +160,7 @@ module cpu_core(
     wire [31:0]     ec_cp0rdata;
     wire [31:0]     ec_reorder_data;
     wire [31:0]     ec_reorder_ex;
+    // * cp0寄存器的读写请求
     wire ec_cp0_badV_en     ;
     wire ec_cp0_count_en    ;
     wire ec_cp0_compare_en  ;
@@ -294,6 +308,37 @@ module cpu_core(
         else            exc_oc_invalid <=   ec_exc_oc || (exc_oc_invalid && if_id_stall);
     end
 
+    btb u_btb(
+        .clk        (aclk),
+        .resetn     (aresetn),
+
+        // * write
+        .wen        (),
+        .remove     (),
+        .index_w    (),
+        .un_j_w     (),
+        .pc_w       (),
+        .target_w   (),
+        // * read
+        .pc_r       (inst_addr), // * I
+        .un_j_r     (), // * O
+        .hit_r      (if_btb_hit), // * O
+        .index_r    (if_btb_index), // * O
+        .target_r   (if_btb_target)  // * O
+    );
+
+    gshre u_gshare(
+        .clk        (aclk),
+        .resetn     (aresetn),
+        .pc_predict (inst_addr[9:2]), // * 预测时输入的PC[9:2]
+        .wen        (),
+        .write_index(),
+        .take       (),
+        // * O
+        .index_predict  (if_gshare_index),
+        .predict        (if_gshare_take)      // * 预测方向
+    );
+
     if_id_seg u_if_id_seg(
         .clk    (aclk),
         .resetn (aresetn),
@@ -305,16 +350,25 @@ module cpu_core(
         .if_addr_error  (if_inst_ADDRESS_ERROR),
         .if_pc          (inst_addr),
         .if_inst_req    (inst_req),
+        .if_btb_hit     (if_btb_hit),
+        .if_btb_target  (if_btb_target),
+        .if_btb_index   (if_btb_index),
+        .if_gshare_take (if_gshare_take),
+        .if_gshare_index(if_gshare_index),
 
         .id_bd          (id_bd),
         .id_addr_error  (id_addr_error),
         .id_pc          (id_pc),
-        .id_inst_req    (id_inst_req)
+        .id_inst_req    (id_inst_req),
+        .id_btb_hit     (id_btb_hit),
+        .id_btb_target  (id_btb_target),
+        .id_btb_index   (id_btb_index),
+        .id_gshare_take (id_gshare_take),
+        .id_gshare_index(id_gshare_index)
     );
 
      // *ID   *          exc_oc 后一条以及inst_data_ok低和取指地址错时都是无效指令
-    assign id_inst  =   exc_oc_invalid || !inst_data_ok || id_addr_error ? 32'b0 : inst_rdata;
-
+    assign id_inst  =   !inst_data_ok && exc_oc_invalid && id_addr_error ? 32'b0 : inst_rdata;
 
     regfile u_regfile(
         .clk    (aclk),
@@ -539,7 +593,7 @@ module cpu_core(
     assign data_wr      = |ex_data_wen;
     assign data_size    = ex_lsV[3] ? 2'b10 : {1'b0, ex_lsV[1]};
     assign ex_data_ADDRESS_ERROR =  !(ec_data_req && ec_load) && ex_data_en &&
-                                    (ex_data_wren == 4'b0011 && data_addr[0] || ex_data_wren == 4'b1111 && data_addr[1:0] != 2'b00);
+                                    (ex_data_wren[1] && data_addr[0] || data_addr[1:0] != 2'b00 && ex_data_wren[3]);
 
     wire [`EXBITS] EX_ex = {ex_ex[5:4], ex_IntegerOverflow, ex_ex[2:1], ex_data_ADDRESS_ERROR};
     assign data_req = ex_data_en && !(|EX_ex) && !ec_exc_oc;

@@ -9,7 +9,7 @@ module cp0 (
     input  [5 :0]   ext_int,
 
     input           wen,    // *write engine
-    input  [7 :0]   addr,   // *write/read address
+    // input  [7 :0]   addr,   // *write/read address
     input  [31:0]   wdata,  // *write in data
 
     input           cp0_badV_en,

@@ -144,3 +144,17 @@
     op_bltzal, op_bgezal, op_j, op_jal, op_beq, op_bne, op_blez, op_bgtz, op_addi, op_addiu, op_slti, \
     op_sltiu, op_andi, op_ori, op_xori, op_lui, op_mfc0, op_mtc0, op_eret, op_lb, op_lh, op_lw, op_lbu, \
     op_lhu, op_sb, op_sh, op_sw
+
+
+
+// * Gshare
+`define GHR_LEN 8
+`define GHR_BITS `GHR_LEN-1:0
+`define PHT_NUMS (1 << `GHR_LEN)
+`define PHT_BITS `PHT_NUMS-1:0
+
+// * BTB
+`define BTB_LEN 10
+`define BTB_BITS `BTB_LEN-1:0
+`define BTB_NUMS (1 << `BTB_LEN)
+`define BTB_ENTRY_BITS `BTB_NUMS-1:0
