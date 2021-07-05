@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns/100ps
 
 `define EXEC_ADDR   32'hbfc0_0380
 `define RESET_ADDR  32'hbfc0_0000
@@ -25,10 +25,19 @@ module pc(
         if(!resetn)             npc <=  `RESET_ADDR ;
         else if(eret)           npc <=  epc         ;
         else if(exc_oc)         npc <=  `EXEC_ADDR  ;
-        else if(stall)                              ;
         else if(PredictFailed)  npc <=  realTarget  ;
-        else if(BranchPredict)  npc <=  BranchTarget;
+        else if(npc != BranchTarget && BranchPredict)  npc <=  BranchTarget;
+        else if(stall)          npc <=  npc         ;
         else                    npc <=  npc+32'd4   ;
     end
+
+    // always @(posedge clk) begin
+    //     if(!resetn)         npc <=  `RESET_ADDR ;
+    //     else if(eret)       npc <=  epc         ;
+    //     else if(exc_oc)     npc <=  `EXEC_ADDR  ;
+    //     else if(stall)      npc <=  npc         ;
+    //     else if(BranchTake) npc <=  BranchTarget;
+    //     else                npc <=  npc+32'd4   ;
+    // end
 
 endmodule

@@ -10,12 +10,12 @@ module gshare(
     // *                预测的时候输入的pc
     input [`GHR_BITS]   pc_predict,
     // *                分支结果真正确定后写的index位置
-    input               wen,    // * 写使能
-    input [`GHR_BITS]   write_index,
-    input               take,   // * wen拉高时使用, 表示真正的分支方向(非预测)
+    input               wen,        // * 写使能
+    input [`GHR_BITS]   windex,
+    input               take,       // * wen拉高时使用, 表示真正的分支方向(非预测)
     // * O
-    output [`GHR_BITS]  index_predict,  // * 预测时用index. 往下存到后面的流水线寄存器中, write的时候使用
-    output              predict         // * 预测的跳转方向
+    output [`GHR_BITS]  rindex,     // * 预测时用index. 往下存到后面的流水线寄存器中, write的时候使用
+    output              predict     // * 预测的跳转方向
 );
 
     // * state
@@ -27,7 +27,7 @@ module gshare(
     reg [`GHR_BITS] GHR;
     reg [1:0]       PHT[`PHT_BITS];
     reg useless;
-    assign index_predict = GHR ^ pc_predict;
+    assign rindex = GHR ^ pc_predict;
 
     integer i;
     always @(posedge clk) begin
@@ -38,15 +38,15 @@ module gshare(
             GHR <= `GHR_LEN'd0;
         end
         else if(wen) begin
-            if(take && PHT[write_index] != Strongly_Take) 
-                PHT[write_index]  <= PHT[write_index]+2'd1;
-            else if(!take && PHT[write_index] != Strongly_Not_Take)
-                PHT[write_index]  <= PHT[write_index]-2'd1;
+            if(take && PHT[windex] != Strongly_Take) 
+                PHT[windex]  <= PHT[windex]+2'd1;
+            else if(!take && PHT[windex] != Strongly_Not_Take)
+                PHT[windex]  <= PHT[windex]-2'd1;
             
             {useless, GHR} <= {GHR, take};
         end
     end
 
-    assign predict = PHT[index_predict][1];
+    assign predict = PHT[rindex][1];
 
 endmodule

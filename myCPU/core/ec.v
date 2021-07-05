@@ -8,6 +8,7 @@ module ec (
 
     input [`EXBITS] ec_ex,
     input [31:0]    ec_pc,
+    // input [31:0]    ec_pc_4,
     input [31:0]    ec_res,
     input           ec_load,
 

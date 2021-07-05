@@ -32,15 +32,17 @@
 
 // *------------------
 
+`define ERET    32'h4200_0018
+
 // * opcode
 `define SPEC    6'b000000
 // `define JR_JALR 6'b000000
 // `define BGEZ_BLTZ_BGEZAL_BLTZAL     6'b000001
 `define J       6'b000010
-// `define JAL     6'b000011
-// `define BEQ     6'b000100
-// `define BNE     6'b000101
-// `define BLEZ    6'b000110
+`define JAL     6'b000011
+`define BEQ     6'b000100
+`define BNE     6'b000101
+`define BLEZ    6'b000110
 `define BGTZ    6'b000111
 
 `define ADDI    6'b001000
@@ -66,10 +68,10 @@
 // *------------------
 
 // * rt code just for BGEZ_BLTZ_BGEZAL_BLTZAL
-// `define BLTZ    5'b00000
-// `define BGEZ    5'b00001
-// `define BLTZAL  5'b10000
-// `define BGEZAL  5'b10001
+`define BLTZ    5'b00000
+`define BGEZ    5'b00001
+`define BLTZAL  5'b10000
+`define BGEZAL  5'b10001
 
 // * rs code just for PRI
 // `define MFC0    5'b00000

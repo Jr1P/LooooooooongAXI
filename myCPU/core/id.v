@@ -21,21 +21,15 @@ endmodule
 module id(
     input           id_addr_error,
 
-    input   [31:0]  id_inst,    // used in Branch and J ins
+    input   [31:0]  id_inst,        // used in Branch and J ins
     input   [31:0]  id_pc,
-    input   [31:0]  rega,         // val in GPR[rs]
-    input   [31:0]  regb,         // val in GPR[rt]
+    input           b_r,            // branch or jr jalr
     // * 跳转相关
-    output          branch,         // ! 1: conditional branch or unconditional jump, 0: not
-    output          jump,           // 1: jump to target, 0: keep going on
     output          al,             // 1: save return address, 0: not
-    output  [31:0]  target,         // valid when JUMP == 1
     // *
     output          SPEC,           // 1: opcode is SPEC, 0: non-SPEC
     output          rs_ren,         // 1: read rs
     output          rt_ren,         // 1: read rt
-    output          b_rs_ren,       // branch read rs
-    output          b_rt_ren,       // branch read rt
     output          load,           // 1: load data from data mem, 0:not
     output          loadX,          // valid when load is 1, 1: signed extend data loaded from data mem, 0: zero extend
     output  [3 :0]  lsV,            // load store vaild, lsV[i] = 1 means the i-th Byte from data mem(or into data mem) is valid
@@ -66,11 +60,7 @@ module id(
     output  [`EXBITS]   id_ex   // Ex
 );
     // TODO: TLB instructions and cache instructions
-
-    wire [31:0] delay_slot_pc   = id_pc + 32'd4;
-    wire [31:0] BranchTarget    = delay_slot_pc + {{14{id_inst[15]}}, {id_inst[15:0], 2'b00}};  // branch target
-    wire [31:0] JTarget         = {delay_slot_pc[31:28], id_inst[25:0], 2'b00};                 // target of J and JAL
-    wire [31:0] JRTarget        = rega;                                                   // target of JR and JALR
+                                            // target of JR and JALR
     wire [5 :0] opcode          = `GET_OP(id_inst);
     wire [4 :0] rscode          = `GET_Rs(id_inst);
     wire [4 :0] rtcode          = `GET_Rt(id_inst);
@@ -84,25 +74,25 @@ module id(
     // * inst table
     decoder #(.bits(6))
         dec_op (
-            .in (`GET_OP(id_inst)),
+            .in (opcode),
             .out(op_d)
         ),
         dec_func (
-            .in (`GET_FUNC(id_inst)),
+            .in (IR_func),
             .out(func_d)
         );
 
     decoder #(.bits(5))
         dec_rs (
-            .in (`GET_Rs(id_inst)),
+            .in (rscode),
             .out(rs_d)
         ),
         dec_rt (
-            .in (`GET_Rt(id_inst)),
+            .in (rtcode),
             .out(rt_d)
         ),
         dec_rd (
-            .in (`GET_Rd(id_inst)),
+            .in (rdcode),
             .out(rd_d)
         ),
         dec_sa (
@@ -172,29 +162,10 @@ module id(
     wire op_sw      = op_d[43];
     wire op_cache   = op_d[47];
 
-    wire eq = rega == regb;
-    wire j_dir  = op_j || op_jal; // 直接跳转
-    wire j_r    = op_jr || op_jalr; // 使用寄存器
-
-    // * 跳转相关
-    assign branch   =   j_dir || j_r || op_beq || op_bne || op_blez || op_bgtz || op_bltz || op_bgez || op_bltzal || op_bgezal;
-
-    assign target   =   {32{!j_dir && !j_r}}    & BranchTarget  |
-                        {32{j_dir}}             & JTarget       |
-                        {32{j_r}}               & JRTarget      ;
-
     assign al       =   op_jal || op_jalr || op_bltzal || op_bgezal;
 
-    assign jump     =   (eq && op_beq) || // *beq
-                        (!eq && op_bne) || // *bne
-                        ((rega[31] || rega == 0) && op_blez) || // *blez
-                        (op_bgtz && (!rega[31] && rega != 0)) || // *bgtz
-                        ((op_bltz || op_bltzal) && rega[31]) || // * bltz bltzal
-                        ((op_bgez || op_bgezal) && !rega[31]) || // * bgez bgezal
-                        (j_dir || j_r); // * j
-
-    assign b_rs_ren =   rscode != 5'h0 && (op_beq || op_bne || op_blez || op_bgtz || op_bltz || op_bltzal || op_bgez || op_bgezal || op_jr || op_jalr);
-    assign b_rt_ren =   rtcode != 5'h0 && (op_beq || op_bne);
+    assign rs_ren   =   rscode != 5'h0 && ((SPEC && !op_sll && !op_sra && !op_srl) || imm || b_r);
+    assign rt_ren   =   rtcode != 5'h0 && (SPEC || op_mtc0 || op_beq || op_bne || (|data_wen));
 
     // * 
     assign func     =   op_addi ? `ADD  :
@@ -206,9 +177,6 @@ module id(
 
     // spec use func of inst
     assign SPEC     =   id_inst && opcode == `SPEC && !op_jr && !op_jalr && !op_syscall && !op_break;  // opcode = 0 and not JR,JALR,BREAK,SYSCALL
-
-    assign rs_ren   =   rscode != 5'h0 && ((SPEC && !op_sll && !op_sra && !op_srl) || imm || (branch && !j_dir));
-    assign rt_ren   =   rtcode != 5'h0 && (SPEC || op_mtc0 || op_beq || op_bne || (|data_wen));
 
     assign load     =   op_lb || op_lh || op_lw || op_lbu || op_lhu;
     assign loadX    =   !op_lbu && !op_lhu;
