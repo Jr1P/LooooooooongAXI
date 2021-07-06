@@ -108,6 +108,8 @@ module id(
     wire op_srav    = op_d[0] && sa_d[0] && func_d[7];
     wire op_jr      = op_d[0] && rt_d[0] && rd_d[0] && sa_d[0] && func_d[8];
     wire op_jalr    = op_d[0] && rt_d[0] && sa_d[0] && func_d[9];
+    wire op_movz    = op_d[0] && sa_d[0] && func_d[10];
+    wire op_movn    = op_d[0] && sa_d[0] && func_d[11];
     wire op_syscall = op_d[0] && func_d[12];
     wire op_break   = op_d[0] && func_d[13];
     wire op_mfhi    = op_d[0] && rs_d[0] && rt_d[0] && sa_d[0] && func_d[16];
@@ -128,8 +130,24 @@ module id(
     wire op_nor     = op_d[0] && sa_d[0] && func_d[39];
     wire op_slt     = op_d[0] && sa_d[0] && func_d[42];
     wire op_sltu    = op_d[0] && sa_d[0] && func_d[43];
+    // TODO: Trap
+    // -------------------
+    wire op_tge     = op_d[0] && func_d[48];
+    wire op_tgeu    = op_d[0] && func_d[49];
+    wire op_tlt     = op_d[0] && func_d[50];
+    wire op_tltu    = op_d[0] && func_d[51];
+    wire op_teq     = op_d[0] && func_d[52];
+    wire op_tne     = op_d[0] && func_d[54];
+    
     wire op_bltz    = op_d[1] && rt_d[0];
     wire op_bgez    = op_d[1] && rt_d[1];
+    wire op_tgei    = op_d[1] && rt_d[8];
+    wire op_tgeiu   = op_d[1] && rt_d[9];
+    wire op_tlti    = op_d[1] && rt_d[10];
+    wire op_tltiu   = op_d[1] && rt_d[11];
+    wire op_teqi    = op_d[1] && rt_d[12];
+    wire op_tnei    = op_d[1] && rt_d[14];
+    // -----------------------
     wire op_bltzal  = op_d[1] && rt_d[16];
     wire op_bgezal  = op_d[1] && rt_d[17];
     wire op_j       = op_d[2];
@@ -148,19 +166,38 @@ module id(
     wire op_lui     = op_d[15];
     wire op_mfc0    = op_d[16] && rs_d[0] && sa_d[0] && id_inst[5:3] == 3'b0;
     wire op_mtc0    = op_d[16] && rs_d[4] && sa_d[0] && id_inst[5:3] == 3'b0;
-    wire op_tlbr    = op_d[16] && rs_d[16] && rt_d[0] && rd_d[0] && sa_d[0] && func_d[1]; //TODO: tlb
+    //TODO: tlb
+    // ----------------------- 
+    wire op_tlbr    = op_d[16] && rs_d[16] && rt_d[0] && rd_d[0] && sa_d[0] && func_d[1]; 
     wire op_tlbwi   = op_d[16] && rs_d[16] && rt_d[0] && rd_d[0] && sa_d[0] && func_d[2];
     wire op_tlbp    = op_d[16] && rs_d[16] && rt_d[0] && rd_d[0] && sa_d[0] && func_d[8];
+    // -----------------------
     wire op_eret    = op_d[16] && rs_d[16] && rt_d[0] && rd_d[0] && sa_d[0] && func_d[24];
+    // TODO: new
+    // ----------------------- 
+    wire op_cop1    = op_d[17] ;
+    wire op_madd    = op_d[28] && rd_d[0] &&    sa_d[0] &&  func_d[0];
+    wire op_maddu   = op_d[28] && rd_d[0] &&    sa_d[0] &&  func_d[1];
+    wire op_mul     = op_d[28] &&               sa_d[0] &&  func_d[2];
+    wire op_msub    = op_d[28] && rd_d[0] &&    sa_d[0] &&  func_d[4];
+    wire op_msubu   = op_d[28] && rd_d[0] &&    sa_d[0] &&  func_d[5];
+    wire op_clz     = op_d[28] && func_d[32];
+    wire op_clo     = op_d[28] && func_d[33];
+    // -----------------------  
     wire op_lb      = op_d[32];
     wire op_lh      = op_d[33];
+    wire op_lwl     = op_d[34];
     wire op_lw      = op_d[35];
     wire op_lbu     = op_d[36];
     wire op_lhu     = op_d[37];
+    wire op_lwr     = op_d[38];
     wire op_sb      = op_d[40];
     wire op_sh      = op_d[41];
+    wire op_swl     = op_d[42];
     wire op_sw      = op_d[43];
+    wire op_swr     = op_d[46];
     wire op_cache   = op_d[47];
+    wire op_ll      = op_d[48];
 
     assign al       =   op_jal || op_jalr || op_bltzal || op_bgezal;
 

@@ -1,5 +1,6 @@
 `timescale 1ns/100ps
 
+// *TODO 中断目的地址变化
 `define EXEC_ADDR   32'hbfc0_0380
 `define RESET_ADDR  32'hbfc0_0000
 module pc(
@@ -7,6 +8,7 @@ module pc(
     input       resetn,
 
     input               stall,          // 1: pipeline stalled
+    input               branch_stall,   // branch与后续指令数据相关导致的stall 
 
     input               BranchPredict,  // 1: take, 0: not take
     input       [31:0]  BranchTarget,   // target address of prediction
@@ -21,12 +23,24 @@ module pc(
     output reg  [31:0]  npc
 );
 
+    reg jumped;
+    always @(posedge clk) begin
+        if(!resetn)
+            jumped <= 1'b0;
+        else if(!eret && !exc_oc && !PredictFailed && BranchPredict && !branch_stall && !jumped)
+            jumped <= 1'b1;
+        else if (stall)
+            jumped <= jumped;
+        else
+            jumped <= 1'b0;
+    end
+
     always @(posedge clk) begin
         if(!resetn)             npc <=  `RESET_ADDR ;
         else if(eret)           npc <=  epc         ;
         else if(exc_oc)         npc <=  `EXEC_ADDR  ;
         else if(PredictFailed)  npc <=  realTarget  ;
-        else if(npc != BranchTarget && BranchPredict)  npc <=  BranchTarget;
+        else if(!jumped && BranchPredict)  npc <=  BranchTarget;
         else if(stall)          npc <=  npc         ;
         else                    npc <=  npc+32'd4   ;
     end

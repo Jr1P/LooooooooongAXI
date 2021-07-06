@@ -17,6 +17,7 @@ module btb(
     
     // * read
     input [31:0]        pc_r,             // * 用于索引
+    input [`GHR_BITS]   ghr,
     // output              un_j_r,
     output              hit_r,
     output [`BTB_BITS]  index_r,
@@ -29,7 +30,7 @@ module btb(
     reg         valid[`BTB_ENTRY_BITS]; // 有效位
 
     wire index_rw_eq = index_w == index_r;
-    assign index_r = pc_r[11:2];
+    assign index_r = pc_r[9:2] ^ ghr; // TODO maybe another way
     // *                       正好读写入的  以及其他
     assign {hit_r, target_r} =  /*remove && index_rw_eq   ?   33'b0                                                   : */
                                 wen && index_rw_eq      ?   {pc_r == pc_w, target_w}                           :

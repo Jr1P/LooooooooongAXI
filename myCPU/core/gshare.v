@@ -15,7 +15,8 @@ module gshare(
     input               take,       // * wen拉高时使用, 表示真正的分支方向(非预测)
     // * O
     output [`GHR_BITS]  rindex,     // * 预测时用index. 往下存到后面的流水线寄存器中, write的时候使用
-    output              predict     // * 预测的跳转方向
+    output              predict,     // * 预测的跳转方向
+    output reg [7:0]    GHR
 );
 
     // * state
@@ -24,9 +25,9 @@ module gshare(
     parameter Weakly_Not_Take   = 2'b01;
     parameter Strongly_Not_Take = 2'b00;
 
-    reg [`GHR_BITS] GHR;
+    // reg [`GHR_BITS] GHR;
     reg [1:0]       PHT[`PHT_BITS];
-    reg useless;
+    // reg useless;
     assign rindex = GHR ^ pc_predict;
 
     integer i;
@@ -42,8 +43,8 @@ module gshare(
                 PHT[windex]  <= PHT[windex]+2'd1;
             else if(!take && PHT[windex] != Strongly_Not_Take)
                 PHT[windex]  <= PHT[windex]-2'd1;
-            
-            {useless, GHR} <= {GHR, take};
+            // * GHR 共八位
+            GHR <= {GHR[6:0], take};
         end
     end
 

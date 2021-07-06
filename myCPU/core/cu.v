@@ -2,7 +2,6 @@
 
 // * Pipeline stall and refresh
 module cu(
-    input [31:0]pd_pc,
     input       pd_bd,
 
     input       inst_data_ok,
@@ -12,8 +11,6 @@ module cu(
     input       data_req,       // *目前的req，即ex段的
     input       data_addr_ok,
     input       data_data_ok,
-    input       wb_regwen,
-    input [4:0] wb_wreg,
 
     input       ex_rs_ren,
     input [4:0] ex_rs,
@@ -25,26 +22,23 @@ module cu(
 
     input       pd_j_r,
     input       id_j_r,
-    // input       ex_j_r,
     input       id_bp_error,
     input       ex_bp_error,
     input       ec_bp_error,
 
     input       b_rs_ren,    // * rs的读有效位
     input [4:0] id_rs,
-    // input       b_rt_ren,    // * rt的读有效位
-    // input [4:0] id_rt,
 
     input       ex_branch,
-    input       ex_dload_req,
     input [4:0] ex_wreg,
-    input       ex_cp0ren,
 
     input       ec_load,
     input [4:0] ec_wreg,
 
     input       div_mul_stall,
     // * O
+    output      branch_stall,
+
     output      pc_stall,
     output      if_pd_stall,
     output      pd_id_stall,
@@ -73,6 +67,7 @@ module cu(
     wire j_r_stall  = pd_j_r;
     wire ex_branch_stall = ex_rel_rs && id_j_r;
     wire ec_branch_stall = ec_rel_rs && ec_dload_req && id_j_r;
+    assign branch_stall = ex_branch_stall || ec_branch_stall;
 
     wire ec_load_to_ex_stall = (ex_rs_ren && ec_wreg == ex_rs || ex_rt_ren && ec_wreg == ex_rt)
                                && ec_dload_req && !ex_branch;
@@ -82,10 +77,10 @@ module cu(
     assign ec_wb_stall  = ec_dload_req && !data_data_ok;
     assign ex_ec_stall  = ec_wb_stall || ec_load_to_ex_stall;
     assign id_ex_stall  = ex_ec_stall || div_mul_stall || data_stall;
-    assign pd_id_stall  = id_ex_stall || ex_branch_stall || ec_branch_stall;
+    assign pd_id_stall  = id_ex_stall || branch_stall;
     assign if_pd_stall  = pd_data_okn || pd_id_stall;
     assign pc_stall     = if_pd_stall || j_r_stall;
-
+                                // * 防止分支延迟槽被吞
     assign if_pd_refresh    =   !(pd_bd && if_pd_stall) &&
                                 (id_bp_error || ex_bp_error || ec_bp_error || 
                                 exc_oc || eret || (id_j_r && !id_ex_stall));
@@ -94,7 +89,7 @@ module cu(
                                 (!pd_id_stall && (exc_oc || pd_data_okn));
 
     assign id_ex_refresh    =   ec_bp_error || 
-                                (!id_ex_stall && (exc_oc || ex_branch_stall || ec_branch_stall));
+                                (!id_ex_stall && (exc_oc || branch_stall));
 
     assign ex_ec_refresh    =   (ec_load_to_ex_stall && data_data_ok) || // * ec load and ex use ec res and data ok */
                                 !ex_ec_stall && (exc_oc || div_mul_stall || data_stall);

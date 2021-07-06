@@ -8,23 +8,31 @@ module ec (
 
     input [`EXBITS] ec_ex,
     input [31:0]    ec_pc,
-    // input [31:0]    ec_pc_4,
     input [31:0]    ec_res,
     input           ec_load,
 
-    input           ec_cp0ren,
+    input           ex_cp0ren,
+    input [7 :0]    ex_cp0raddr,
     input           ec_cp0wen,
-    // input [7 :0]    ec_cp0addr,
+    input [7 :0]    ec_cp0waddr,
     input [31:0]    ec_wdata,
+
     input           ec_bd,
     input           ec_eret,
 
-    input           ec_cp0_badV_en,
-    input           ec_cp0_count_en,
-    input           ec_cp0_compare_en,
-    input           ec_cp0_status_en,
-    input           ec_cp0_cause_en,
-    input           ec_cp0_epc_en,
+    input           rcp0_badV_en,
+    input           rcp0_count_en,
+    input           rcp0_compare_en,
+    input           rcp0_status_en,
+    input           rcp0_cause_en,
+    input           rcp0_epc_en,
+
+    input           wcp0_badV_en,
+    input           wcp0_count_en,
+    input           wcp0_compare_en,
+    input           wcp0_status_en,
+    input           wcp0_cause_en,
+    input           wcp0_epc_en,
 
     input [31:0]    ec_reorder_ex,
     input           wb_eret,
@@ -53,9 +61,12 @@ module ec (
     wire exc_valid =    cp0_status[`Status_EXL] && !wb_eret ? 1'b1 : 
                         (ext_int_response || (|ec_ex));
 
-    assign reorder_data =   ec_cp0ren ? cp0rdata : ec_reorder_ex;
+    assign reorder_data =   ec_reorder_ex;
     wire [31:0] exc_badvaddr = ec_ex[5] ? ec_pc : ec_res; // FIXME: ec_pc可能需要修改，取地址错误的地址不一定是ec_pc
-    assign exc_oc = !cp0_status[`Status_EXL] && exc_valid;
+    assign exc_oc = exc_valid && !cp0_status[`Status_EXL];
+    wire [31:0] ex_cp0rdata;
+    assign cp0rdata =   {{7{ex_cp0ren}} & ex_cp0raddr} == 
+                        {{7{ec_cp0wen}} & ec_cp0waddr} ? ec_wdata : ex_cp0rdata;
     // * CP0 regs
     cp0 u_cp0(
         .clk    (clk),
@@ -67,12 +78,19 @@ module ec (
         // .addr   (ec_cp0addr),
         .wdata  (ec_wdata),
 
-        .cp0_badV_en    (ec_cp0_badV_en),
-        .cp0_count_en   (ec_cp0_count_en),
-        .cp0_compare_en (ec_cp0_compare_en),
-        .cp0_status_en  (ec_cp0_status_en),
-        .cp0_cause_en   (ec_cp0_cause_en),
-        .cp0_epc_en     (ec_cp0_epc_en),
+        .rcp0_badV_en    (rcp0_badV_en),
+        .rcp0_count_en   (rcp0_count_en),
+        .rcp0_compare_en (rcp0_compare_en),
+        .rcp0_status_en  (rcp0_status_en),
+        .rcp0_cause_en   (rcp0_cause_en),
+        .rcp0_epc_en     (rcp0_epc_en),
+
+        .wcp0_badV_en    (wcp0_badV_en),
+        .wcp0_count_en   (wcp0_count_en),
+        .wcp0_compare_en (wcp0_compare_en),
+        .wcp0_status_en  (wcp0_status_en),
+        .wcp0_cause_en   (wcp0_cause_en),
+        .wcp0_epc_en     (wcp0_epc_en),
 
         .exc_valid      (exc_valid),
         .exc_excode     (exc_excode),
@@ -82,7 +100,7 @@ module ec (
         .exc_eret       (ec_eret),
 
         // * O
-        .rdata              (cp0rdata),
+        .rdata              (ex_cp0rdata),
 
         .ext_int_response   (ext_int_response),
 

@@ -29,7 +29,7 @@ module div(
 
     always @(posedge clk) begin
         if(!resetn || finish)   cnt <= 5'd0;
-        if(cancel)         cnt <= 5'd1;
+        if(cancel)              cnt <= 5'd1;
         else if(en || working)  cnt <= cnt+5'd1;
     end
 

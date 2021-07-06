@@ -156,7 +156,7 @@
 `define PHT_BITS `PHT_NUMS-1:0
 
 // * BTB
-`define BTB_LEN 10
+`define BTB_LEN 8
 `define BTB_BITS `BTB_LEN-1:0
 `define BTB_NUMS (1 << `BTB_LEN)
 `define BTB_ENTRY_BITS `BTB_NUMS-1:0

@@ -3,7 +3,7 @@
 
 // * five segment pipeline cpu
 
-// TODO: 1. branch  2. add if2 seg   3. TLB inst  mul inst  4. interrupt mech    5. maybe 反思
+// TODO: 1. on board test 2.时序 3. TLB inst  mul inst  4. interrupt mech    5. maybe 反思
 module cpu_core(
     input   [5 :0]  ext_int,        // *硬件中断
 
@@ -108,14 +108,11 @@ module cpu_core(
 
     wire [31:0]     id_pc;
     wire [31:0]     id_pc_8;
-    // wire            id_inst_req;
     wire [31:0]     id_inst;
     wire [4 :0]     id_rs = `GET_Rs(id_inst);
     wire [4 :0]     id_rt = `GET_Rt(id_inst);
     wire            id_bd;
-    // wire            id_jump;
     wire            id_branch;
-    // wire [31:0]     id_target;
     wire            id_al;
     wire            id_SPEC;
     wire            id_rs_ren;
@@ -183,6 +180,7 @@ module cpu_core(
     wire [31:0]     ex_wdata;
     wire            ex_eret;
     wire            ex_cp0ren;
+    wire [31:0]     ex_cp0rdata;
     wire            ex_cp0wen;
     wire [`CP0ADDR] ex_cp0addr;
     wire            ex_mult;
@@ -193,7 +191,6 @@ module cpu_core(
     wire [31:0]     ex_hilordata;
     // * ex part branch
     wire            ex_bp_take;
-    // wire [31:0]     ex_target;
     wire            ex_realj;
     wire [1 :0]     ex_wait_seg;
     wire            ex_btb_wen;
@@ -230,9 +227,7 @@ module cpu_core(
     wire [31:0]     ec_reorder_ex;
     // * ex part branch
     wire            ec_bp_take;
-    // wire [31:0]     ec_target;
     wire            ec_realj;
-    // wire [31:0]     ec_real_target;
     wire [1 :0]     ec_wait_seg;
     // * 写BTB以及gshare
     wire            ec_btb_wen;
@@ -255,7 +250,6 @@ module cpu_core(
     wire [31:0]     wb_pc;
     wire [31:0]     wb_inst;
     wire            wb_load;
-    // wire [31:0]     wb_rdata;
     wire            wb_regwen;
     wire [4 :0]     wb_wreg;
     wire            wb_eret;
@@ -263,12 +257,12 @@ module cpu_core(
     wire [31:0]     wb_reorder_ec;
 
     // * CU
-    // wire    pre_ins;    // * 是否是要用前一次的指令
     // * 分支跳转方向错误
     wire    id_bp_error;
     wire    ex_bp_error;
     wire    ec_bp_error;
 
+    wire    branch_stall;
     wire    pc_stall;
     wire    if_pd_stall;
     wire    pd_id_stall;
@@ -287,6 +281,7 @@ module cpu_core(
     // * 重定向数据
     wire [31:0] ex_reorder_data =   ex_al           ?   ex_pc_8         :
                                     (|ex_hiloren)   ?   ex_hilordata    :
+                                    ex_cp0ren       ?   ex_cp0rdata     :
                                                         ex_res          ;
 
     // * cache / uncache
@@ -297,7 +292,6 @@ module cpu_core(
     assign cache_tag    = 32'b0;
 
     reg inst_cache_state;
-    reg data_cache_state;
     parameter IDLE          =   1'b0;
     parameter BUSY          =   1'b1;
     always @(posedge aclk)
@@ -306,16 +300,9 @@ module cpu_core(
                                 inst_data_ok    ? IDLE :
                                 inst_cache_state       ;
 
-    always @(posedge aclk)
-        data_cache_state    <=  !aresetn        ? IDLE :
-                                data_addr_ok    ? BUSY :
-                                data_data_ok    ? IDLE :
-                                data_cache_state       ;
-
     assign inst_req = (!inst_cache_state || inst_data_ok) && !if_addr_error && !ec_exc_oc;
     
     cu u_cu(
-        .pd_pc          (pd_pc),
         .pd_bd          (pd_bd),
 
         .inst_data_ok   (inst_data_ok),
@@ -325,8 +312,6 @@ module cpu_core(
         .data_req       (data_req),
         .data_addr_ok   (data_addr_ok),
         .data_data_ok   (data_data_ok),
-        .wb_regwen      (wb_regwen),
-        .wb_wreg        (wb_wreg),
 
         .ex_rs_ren  (ex_rs_ren),
         .ex_rs      (ex_rs),
@@ -338,7 +323,6 @@ module cpu_core(
 
         .pd_j_r     (pd_j_r),
         .id_j_r     (id_j_r),
-        // .ex_j_r     (ex_j_r),
 
         .id_bp_error(id_bp_error),
         .ex_bp_error(ex_bp_error),
@@ -346,11 +330,7 @@ module cpu_core(
 
         .b_rs_ren   (id_b_rs_ren),
         .id_rs      (id_rs),
-        // .b_rt_ren   (id_b_rt_ren),
-        // .id_rt      (id_rt),
         .ex_branch      (ex_branch),
-        .ex_dload_req   (ex_load && data_req), // * load请求
-        .ex_cp0ren      (ex_cp0ren),
         .ex_wreg        (ex_wreg),
  
         .ec_load    (ec_load),
@@ -358,6 +338,7 @@ module cpu_core(
 
         .div_mul_stall  (div_mul_stall),
         // * O
+        .branch_stall   (branch_stall),
         .pc_stall       (pc_stall),
         .if_pd_stall    (if_pd_stall),
         .pd_id_stall    (pd_id_stall),
@@ -378,12 +359,13 @@ module cpu_core(
     wire [31:0] bp_target;  // * 目的地址
     wire        bp_fail;    // * 失败
     wire [31:0] bp_real_target; // * 真正的目的地址
+    wire [`GHR_BITS]    ghr;
 
     assign bp_take = pd_dir || pd_bp_ok || id_j_r;
-    assign bp_target =  {32{pd_dir}}    & pd_target     |
-                        {32{pd_bp_ok}}  & pd_btb_target |
-                        {32{id_j_r}}    & re_rs         ;
-    assign bp_fail = id_bp_error || ex_bp_error || ec_bp_error;
+   
+    assign bp_target =  id_j_r ? re_rs :
+                        pd_dir ? pd_target : pd_btb_target;
+    assign bp_fail = ((id_bp_error || ex_bp_error) && !ec_exc_oc) || ec_bp_error;
     assign bp_real_target = ec_bp_error ? 
                                 ec_bp_take ? ec_pc_8 : ec_btb_wtarget
                           : ex_bp_error ?
@@ -396,6 +378,8 @@ module cpu_core(
         .clk            (aclk),
         .resetn         (aresetn),
         .stall          (pc_stall),
+        .branch_stall   (branch_stall),
+
         .BranchPredict  (bp_take),
         .BranchTarget   (bp_target),
         .PredictFailed  (bp_fail),
@@ -430,6 +414,7 @@ module cpu_core(
         .target_w   (ec_btb_wtarget),
         // * read
         .pc_r       (npc), // * I
+        .ghr        (ghr),  // * I
         .hit_r      (if_btb_hit), // * O
         .index_r    (if_btb_index), // * O
         .target_r   (if_btb_target)  // * O
@@ -445,7 +430,8 @@ module cpu_core(
         .take       (ec_realj),
         // * O
         .rindex     (if_gshare_index),
-        .predict    (if_gshare_take)      // * 预测方向
+        .predict    (if_gshare_take),      // * 预测方向
+        .GHR        (ghr)
     );
 
     if_pd_seg u_if_pd_seg(
@@ -477,18 +463,33 @@ module cpu_core(
         .pd_gshare_index(pd_gshare_index)
     );
 
-    // * PD             exc_oc 后一条以及inst_data_ok低和取指地址错时都是无效指令
+    // * PD
     reg bp_fail_flush, pd_eret_d;
     always @(posedge aclk) begin
-        if(!aresetn)    bp_fail_flush <= 1'b0;
-        else            bp_fail_flush <= bp_fail || (if_pd_stall && bp_fail_flush && !pd_bd);
+        if(!aresetn)        bp_fail_flush <= 1'b0;
+        else if(!ec_exc_oc) begin
+            if(ec_bp_error || ex_bp_error)
+                bp_fail_flush <= 1'b1;
+            else if(id_bp_error)
+                bp_fail_flush <= !pd_bd || inst_data_ok;
+            else
+                bp_fail_flush <= !inst_data_ok && bp_fail_flush;
+        end
+        else
+            bp_fail_flush <= 1'b0;
     end
     always @(posedge aclk) begin
         if(!aresetn)    pd_eret_d   <= 1'b0;
-        else            pd_eret_d   <= pd_eret;
+        else            pd_eret_d   <= pd_eret || (!inst_data_ok && pd_eret_d);
     end
 
-    assign pd_inst  =   inst_rdata & {32{inst_data_ok && !bp_fail_flush && !pd_eret_d && !ex_j_r && !exc_oc_invalid && !pd_addr_error}};
+    // *        exc_oc 后一条以及inst_data_ok低和取指地址错时, 分支等等都是无效指令
+    wire [31:0] mask =  {32{
+                            inst_data_ok    && !bp_fail_flush       && 
+                            !pd_eret_d      && (!ex_j_r || pd_bd)   && 
+                            !exc_oc_invalid && !pd_addr_error       }};
+
+    assign pd_inst  =   inst_rdata & mask;
 
     // * 指令预解码
     pd u_pd(
@@ -537,7 +538,6 @@ module cpu_core(
         .pd_inst        (pd_inst),
         .pd_bd          (pd_bd),
         .pd_branch      (pd_branch),
-        // .pd_target      (pd_target),
         .pd_b           (pd_b),
         .pd_j_dir       (pd_j_dir),
         .pd_j_r         (pd_j_r),
@@ -630,7 +630,7 @@ module cpu_core(
         .wait_seg   (id_wait_seg)
     );
 
-    assign id_bp_error = id_wait_seg == 2'b0 && id_realj != id_bp_take
+    assign id_bp_error = id_realj != id_bp_take && id_wait_seg == 2'b0
                          && id_gshare_wen;
     
     id u_id(
@@ -809,7 +809,7 @@ module cpu_core(
         .realj      (ex_realj)
     );
 
-    assign ex_bp_error = ex_wait_seg == 2'b0 && ex_realj != ex_bp_take
+    assign ex_bp_error = ex_realj != ex_bp_take && ex_wait_seg == 2'b0
                        && ex_gshare_wen;
 
     alu u_alu(
@@ -823,6 +823,7 @@ module cpu_core(
         .res                (ex_res)
     );
 
+    // * MUL and DIV
     wire [65:0] mul_res;
     wire mul_working, mul_finish;
     wire mul_cancel = mul_working && ex_mult;
@@ -863,6 +864,7 @@ module cpu_core(
     assign div_mul_stall = !ec_exc_oc && ((|ex_hiloren) || (|ex_hilowen)) && (div_working || mul_working);
 
     // * write HI LO
+    // !TODO 如果变成关键路径可以将HI/LO放到 ec 段写
     wire [31:0] hiwdata =   ex_hilowen == 2'b10 ? inAlu1 : // *GPR[rs] -> HI
                             mul_finish ? mul_res[63:32] :
                             div_finish ? remainder : 32'b0;
@@ -887,11 +889,11 @@ module cpu_core(
     assign data_addr    = ex_daddr & 32'h1fff_ffff;
     assign data_wr      = |ex_data_wen;
     assign data_size    = ex_lsV[3] ? 2'b10 : {1'b0, ex_lsV[1]};
-    assign ex_data_ADDRESS_ERROR =  !(ec_data_req && ec_load) && ex_data_en &&
-                                    (ex_data_wren[1] && data_addr[0] || data_addr[1:0] != 2'b00 && ex_data_wren[3]);
+    wire notAlign       = (ex_data_wren[1] && data_addr[0] || data_addr[1:0] != 2'b00 && ex_data_wren[3]);
+    assign ex_data_ADDRESS_ERROR =  notAlign && !(ec_data_req && ec_load) && ex_data_en;   
 
     wire [`EXBITS] EX_ex = {ex_ex[5:4], ex_IntegerOverflow, ex_ex[2:1], ex_data_ADDRESS_ERROR};
-    assign data_req = ex_data_en && !(|EX_ex) && !ec_exc_oc;
+    assign data_req = !ec_exc_oc && !ex_data_ADDRESS_ERROR && ex_data_en;
 
     // * 重定向一致 ex_wdata, data_wdata
     assign data_wdata = {   {8{ex_lsV[3]}} & ex_wdata[31:24],
@@ -1022,7 +1024,7 @@ module cpu_core(
         .realj      (ec_realj)
     );
 
-    assign ec_bp_error = ec_wait_seg == 2'b0 && ec_realj != ec_bp_take
+    assign ec_bp_error = ec_realj != ec_bp_take && ec_wait_seg == 2'b0
                        && ec_gshare_wen;
 
     // *mtc0的写入数据
@@ -1044,22 +1046,32 @@ module cpu_core(
 
         .ec_ex          (ec_ex),
         .ec_pc          (ec_pc),
-        // .ec_pc_8        (ec_pc_4),
         .ec_res         (ec_res),
         .ec_load        (ec_load),
-        .ec_cp0ren      (ec_cp0ren),
+
+        .ex_cp0ren      (ex_cp0ren),
+        .ex_cp0raddr    (ex_cp0addr),
+
         .ec_cp0wen      (ec_cp0wen),
-        // .ec_cp0addr     (ec_cp0addr),
+        .ec_cp0waddr    (ec_cp0addr),
         .ec_wdata       (ec_wdata),
+        
         .ec_bd          (ec_bd),
         .ec_eret        (ec_eret),
+        // * EX 段读 EC 段写
+        .rcp0_badV_en   (ex_cp0_badV_en),
+        .rcp0_count_en  (ex_cp0_count_en),
+        .rcp0_compare_en(ex_cp0_compare_en),
+        .rcp0_status_en (ex_cp0_status_en),
+        .rcp0_cause_en  (ex_cp0_cause_en),
+        .rcp0_epc_en    (ex_cp0_epc_en),
 
-        .ec_cp0_badV_en     (ec_cp0_badV_en),
-        .ec_cp0_count_en    (ec_cp0_count_en),
-        .ec_cp0_compare_en  (ec_cp0_compare_en),
-        .ec_cp0_status_en   (ec_cp0_status_en),
-        .ec_cp0_cause_en    (ec_cp0_cause_en),
-        .ec_cp0_epc_en      (ec_cp0_epc_en),
+        .wcp0_badV_en   (ec_cp0_badV_en),
+        .wcp0_count_en  (ec_cp0_count_en),
+        .wcp0_compare_en(ec_cp0_compare_en),
+        .wcp0_status_en (ec_cp0_status_en),
+        .wcp0_cause_en  (ec_cp0_cause_en),
+        .wcp0_epc_en    (ec_cp0_epc_en),
 
         .ec_reorder_ex  (ec_reorder_ex),
         .wb_eret        (wb_eret),
@@ -1068,7 +1080,7 @@ module cpu_core(
         .exc_oc             (ec_exc_oc),
 
         .ext_int_response   (ext_int_response),
-        .cp0rdata           (ec_cp0rdata),
+        .cp0rdata           (ex_cp0rdata),
         .cp0_epc            (cp0_epc),
         .reorder_data       (ec_reorder_data)
     );
