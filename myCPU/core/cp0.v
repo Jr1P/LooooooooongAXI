@@ -18,6 +18,10 @@ module cp0 (
     input           rcp0_status_en,
     input           rcp0_cause_en,
     input           rcp0_epc_en,
+    // input           rcp0_lo1_en,
+    // input           rcp0_lo2_en,
+    // input           rcp0_pagemask_en,
+    // input           rcp0_index_en,
 
     input           wcp0_badV_en,
     input           wcp0_count_en,
@@ -25,6 +29,10 @@ module cp0 (
     input           wcp0_status_en,
     input           wcp0_cause_en,
     input           wcp0_epc_en,
+    // input           wcp0_lo1_en,
+    // input           wcp0_lo2_en,
+    // input           wcp0_pagemask_en,
+    // input           wcp0_index_en,
 
     // * exception occur
     input           exc_valid,   // * 1: 例外处理
@@ -38,6 +46,7 @@ module cp0 (
     
     output          ext_int_response,   // *中断响应
     // * cp0 regs
+    output [31:0]       index,
     output [31:0]       cause,
     output [31:0]       status,
     output reg [31:0]   epc         // * read and write | reset val : null
@@ -47,13 +56,43 @@ module cp0 (
     wire exc_addr   = exc_excode == `EXC_AdEL
                     | exc_excode == `EXC_AdES;
 
-    // *Index (4, 0) | read and partially writeable
-    // reg Index_P;
-    // reg [`Index_IndexBITs] Index_Index;
-    // assign index = {Index_P, 31'b0} | Index_Index;
-    // wire index_wen = wen && addr == `CP0_Index;
+    // // *Index (0, 0)
+    // reg Index_P;            // * r      reset value: null
+    // // * 32项的TLB
+    // reg [4:0] Index_Index;  // * r/w    reset value: null
+    // assign index = {Index_P, 26'b0, Index_Index};
+    // wire index_wen = wen && wcp0_index_en;
     // always @(posedge clk) begin
-        // TODO: INDEX
+    //     if(index_wen)   Index_Index = wdata[4:0];
+    // end
+
+    // // * Entrylo 0,1:(2, 0), (3, 0)
+    // reg [19:0] EntryLo1_PFN, EntryLo2_PFN;      // * r/w    reset value: null
+    // reg [5 :0] EntryLo1_Flags, EntryLo2_Flags;  // * r/w    reset value: null
+    // wire [31:0] lo1rdata = {6'b0, EntryLo1_PFN, EntryLo1_Flags};
+    // wire [31:0] lo2rdata = {6'b0, EntryLo2_PFN, EntryLo2_Flags};
+    // wire lo1_wen = wen && wcp0_lo1_en;
+    // wire lo2_wen = wen && wcp0_lo2_en;
+    // always @(posedge clk) begin
+    //     if(lo1_wen) begin
+    //         EntryLo1_PFN    <= wdata[`EntryLo_PFN];
+    //         EntryLo1_Flags  <= wdata[`EntryLo_Flags];
+    //     end
+    // end
+
+    //  always @(posedge clk) begin
+    //     if(lo2_wen) begin
+    //         EntryLo2_PFN    <= wdata[`EntryLo_PFN];
+    //         EntryLo2_Flags  <= wdata[`EntryLo_Flags];
+    //     end
+    // end
+
+    // // * PageMask (5, 0) 屏蔽特定位, 某个位为1则屏蔽
+    // reg [11:0] Page_Mask;   // * r/w    reset value: null
+    // wire [31:0] pagemask = {7'b0, Page_Mask, 13'b0};
+    // wire pagemask_wen = wen && wcp0_pagemask_en;
+    // always @(posedge clk) begin
+    //     if(pagemask_wen) Page_Mask <= wdata[`PageMask_Mask];
     // end
 
     // *BadVAddr (8, 0) | read only | reset val: null
@@ -175,11 +214,15 @@ module cp0 (
     };
 
     assign rdata = 
-            {32{rcp0_badV_en     }} & badvaddr   |
-            {32{rcp0_count_en    }} & count      |
-            {32{rcp0_compare_en  }} & compare    |
-            {32{rcp0_status_en   }} & status     |
-            {32{rcp0_cause_en    }} & cause      |
-            {32{rcp0_epc_en      }} & epc        ;
+            // {32{rcp0_index_en   }} & index      |
+            // {32{rcp0_lo1_en     }} & lo1rdata   |
+            // {32{rcp0_lo2_en     }} & lo2rdata   |
+            // {32{rcp0_pagemask_en}} & pagemask   |
+            {32{rcp0_badV_en    }} & badvaddr   |
+            {32{rcp0_count_en   }} & count      |
+            {32{rcp0_compare_en }} & compare    |
+            {32{rcp0_status_en  }} & status     |
+            {32{rcp0_cause_en   }} & cause      |
+            {32{rcp0_epc_en     }} & epc        ;
 
 endmodule

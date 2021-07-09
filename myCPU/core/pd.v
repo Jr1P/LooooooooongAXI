@@ -5,7 +5,7 @@ module pd (
     input [31:0]    inst,
     input [31:0]    pc,
     output          branch, // ! 1: conditional branch or unconditional jump, 0: not
-    // output          jump,   // 1: jump to target, 0: keep going on
+
     output          j_dir,  // * 直接跳转
     output          j_r,    // * 使用寄存器直接跳转
     output          b,      // * 需判断的条件跳转
@@ -54,7 +54,7 @@ module pd (
     assign op_bgtz      = opcode == `BGTZ && rtcode == 5'd0;
 
      // * 只有直接跳转确定是跳转的, b需要判断一些条件, beq 0 0 可以当做直接跳转
-    assign take     = j_dir || j_r || (op_beq && (rscode | rdcode) == 5'd0);
+    assign take     = j_dir || j_r || (op_beq && (rscode | rtcode) == 5'd0);
     assign target_ok= j_dir || b;   // * j_r类需要寄存器才能知道地址
     assign target   = j_dir ? JTarget : BranchTarget;
     assign j_dir    = op_j || op_jal;

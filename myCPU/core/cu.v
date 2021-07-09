@@ -2,10 +2,14 @@
 
 // * Pipeline stall and refresh
 module cu(
+    // input       pd_pc_zero,
     input       pd_bd,
+    input       id_bd,
+    input       ex_bd,
 
+    input       inst_addr_ok,
     input       inst_data_ok,
-    input       pd_inst_req,
+    input       inst_cache_state,
 
     input       ec_dload_req,    // *前一个req，即ec段的
     input       data_req,       // *目前的req，即ex段的
@@ -35,6 +39,7 @@ module cu(
     input       ec_load,
     input [4:0] ec_wreg,
 
+    input       inst_bank_valid,
     input       div_mul_stall,
     // * O
     output      branch_stall,
@@ -71,24 +76,28 @@ module cu(
 
     wire ec_load_to_ex_stall = (ex_rs_ren && ec_wreg == ex_rs || ex_rt_ren && ec_wreg == ex_rt)
                                && ec_dload_req && !ex_branch;
-    wire pd_data_okn = pd_inst_req && !inst_data_ok;
+    wire pd_inst_okn = inst_cache_state && /*!inst_addr_ok &&*/ !inst_data_ok;
 
     // *                 ec是load但没返回data_ok
     assign ec_wb_stall  = ec_dload_req && !data_data_ok;
     assign ex_ec_stall  = ec_wb_stall || ec_load_to_ex_stall;
     assign id_ex_stall  = ex_ec_stall || div_mul_stall || data_stall;
     assign pd_id_stall  = id_ex_stall || branch_stall;
-    assign if_pd_stall  = pd_data_okn || pd_id_stall;
-    assign pc_stall     = if_pd_stall || j_r_stall;
-                                // * 防止分支延迟槽被吞
-    assign if_pd_refresh    =   !(pd_bd && if_pd_stall) &&
-                                (id_bp_error || ex_bp_error || ec_bp_error || 
-                                exc_oc || eret || (id_j_r && !id_ex_stall));
+    assign if_pd_stall  = pd_id_stall || (pd_inst_okn && !inst_bank_valid);
+    assign pc_stall     = if_pd_stall || j_r_stall || !inst_addr_ok && !inst_bank_valid;
 
-    assign pd_id_refresh    =   (ex_bp_error || ec_bp_error) || 
-                                (!pd_id_stall && (exc_oc || pd_data_okn));
+    // TODO: find a way to optimalize 
+                                // * 要防止分支延迟槽被吞
+    assign if_pd_refresh    =   !if_pd_stall && id_bp_error ||
+                                ex_bp_error && (!pd_bd || (!pd_inst_okn && !ec_wb_stall)) ||
+                                ec_bp_error && (ex_bd || id_bd || !pd_inst_okn) ||
+                                (ec_bp_error && ex_bd) || exc_oc || eret;
 
-    assign id_ex_refresh    =   ec_bp_error || 
+    assign pd_id_refresh    =   (!pd_id_stall && ex_bp_error && id_bd) || 
+                                (ec_bp_error && (id_bd || pd_bd && !ex_bd && !pd_inst_okn)) || 
+                                (!pd_id_stall && pd_inst_okn && !inst_bank_valid) || exc_oc;
+
+    assign id_ex_refresh    =   ec_bp_error && !(div_mul_stall || data_stall) || 
                                 (!id_ex_stall && (exc_oc || branch_stall));
 
     assign ex_ec_refresh    =   (ec_load_to_ex_stall && data_data_ok) || // * ec load and ex use ec res and data ok */

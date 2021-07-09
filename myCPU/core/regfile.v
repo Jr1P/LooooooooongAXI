@@ -19,6 +19,7 @@ module regfile(
 
     reg [31:0] GPR[31:1];
 
+    // *TODO 可能需要初始化
     always @(posedge clk) if(wen && wreg) GPR[wreg] <= wdata;
 
     assign outA = !rs ? 32'b0 : (wen && wreg == rs) ? wdata : GPR[rs];

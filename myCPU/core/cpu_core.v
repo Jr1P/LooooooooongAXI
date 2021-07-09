@@ -52,9 +52,11 @@ module cpu_core(
     wire            if_gshare_take;
     // * PD
     wire            pd_addr_error;
+    // wire            pd_pc_zero;
     wire [31:0]     pd_pc;
     wire [31:0]     pd_pc_8;
     wire [31:0]     pd_inst;
+    wire            pd_inst_invalid;
     wire            pd_branch;
     wire            pd_j_dir;
     wire            pd_j_r;
@@ -147,6 +149,9 @@ module cpu_core(
     wire            id_bp_take;
     wire            id_realj;
     wire [1 :0]     id_wait_seg;
+    // * gshare 预写
+    wire            id_gshare_pre_wen;
+    wire            id_pre_bit;
     // *EX
     wire [`EXBITS]  ex_ex;
     wire [31:0]     ex_pc;
@@ -255,6 +260,12 @@ module cpu_core(
     wire            wb_eret;
     wire [31:0]     wb_reorder_data;
     wire [31:0]     wb_reorder_ec;
+    // * Branch Predict
+    wire        bp_take;    // * 确定的跳转或者预测的跳转均为 1'b1
+    wire [31:0] bp_target;  // * 目的地址
+    wire        bp_fail;    // * 失败
+    wire [31:0] bp_real_target; // * 真正的目的地址
+    wire [`GHR_BITS]    ghr;
 
     // * CU
     // * 分支跳转方向错误
@@ -269,6 +280,8 @@ module cpu_core(
     wire    id_ex_stall;
     wire    ex_ec_stall;
     wire    ec_wb_stall;
+
+    reg inst_bank_valid;
 
     wire    if_pd_refresh;
     wire    pd_id_refresh;
@@ -300,13 +313,25 @@ module cpu_core(
                                 inst_data_ok    ? IDLE :
                                 inst_cache_state       ;
 
-    assign inst_req = (!inst_cache_state || inst_data_ok) && !if_addr_error && !ec_exc_oc;
+    // reg last_branch_stall;
+    // always @(posedge aclk) begin
+    //     if(!aresetn)    last_branch_stall   <= 1'b0;
+    //     else            last_branch_stall   <= branch_stall || (!if_pd_stall && pd_j_r);
+    // end
+
+    assign inst_req =   !id_bp_error && !ex_bp_error && !ec_bp_error &&
+                        !ec_exc_oc && (!inst_cache_state || inst_data_ok) && 
+                        !pd_eret && !if_addr_error && !id_j_r;
     
     cu u_cu(
+        // .pd_pc_zero     (pd_pc_zero),
         .pd_bd          (pd_bd),
+        .id_bd          (id_bd),
+        .ex_bd          (ex_bd),
 
-        .inst_data_ok   (inst_data_ok),
-        .pd_inst_req    (pd_inst_req),
+        .inst_addr_ok       (inst_addr_ok),
+        .inst_data_ok       (inst_data_ok),
+        .inst_cache_state   (inst_cache_state),
 
         .ec_dload_req   (ec_data_req && ec_load),   // * ec取数请求
         .data_req       (data_req),
@@ -336,6 +361,7 @@ module cpu_core(
         .ec_load    (ec_load),
         .ec_wreg    (ec_wreg),
 
+        .inst_bank_valid   (inst_bank_valid),
         .div_mul_stall  (div_mul_stall),
         // * O
         .branch_stall   (branch_stall),
@@ -355,12 +381,6 @@ module cpu_core(
 
     // *IF
     // * 分支预测
-    wire        bp_take;    // * 确定的跳转或者预测的跳转均为 1'b1
-    wire [31:0] bp_target;  // * 目的地址
-    wire        bp_fail;    // * 失败
-    wire [31:0] bp_real_target; // * 真正的目的地址
-    wire [`GHR_BITS]    ghr;
-
     assign bp_take = pd_dir || pd_bp_ok || id_j_r;
    
     assign bp_target =  id_j_r ? re_rs :
@@ -371,12 +391,18 @@ module cpu_core(
                           : ex_bp_error ?
                                 ex_bp_take ? ex_pc_8 : ex_btb_wtarget
                           :     id_bp_take ? id_pc_8 : id_btb_wtarget;
+    assign id_gshare_pre_wen = id_gshare_wen && (id_bp_error || !ec_bp_error);
+    assign id_pre_bit = id_bp_error ? !id_bp_take : id_bp_take;
 
     wire [31:0]     exc_pc = ec_cp0_epc_en && ec_cp0wen ? ec_wdata : cp0_epc;
 
     pc u_pc(
         .clk            (aclk),
         .resetn         (aresetn),
+
+        // .inst_addr_ok   (inst_addr_ok),
+        .pd_id_stall    (pd_id_stall),
+        .inst_bank_valid(inst_bank_valid),
         .stall          (pc_stall),
         .branch_stall   (branch_stall),
 
@@ -394,13 +420,13 @@ module cpu_core(
     );
 
     // *               取前一条
-    assign inst_addr =  if_pd_stall ? pd_pc : npc;
+    assign inst_addr =  /*if_pd_stall ? pd_pc :*/ npc;
     assign if_addr_error = npc[0] | npc[1];
 
     reg exc_oc_invalid; // * 异常发生后紧接着取出的指令不是正确指令
     always @(posedge aclk) begin
         if(!aresetn)    exc_oc_invalid <=   1'b0;
-        else            exc_oc_invalid <=   ec_exc_oc || (exc_oc_invalid && if_pd_stall);
+        else            exc_oc_invalid <=   ec_exc_oc || (if_pd_stall && exc_oc_invalid);
     end
 
     btb u_btb(
@@ -424,14 +450,17 @@ module cpu_core(
         .clk        (aclk),
         .resetn     (aresetn),
         .pc_predict (npc[9:2]), // * 预测时输入的PC[9:2]
-        // * Write
+        // * id pre_write
+        .pre_wen    (id_gshare_pre_wen),
+        .pre_take   (id_pre_bit),
+        // * ec Write
         .wen        (ec_gshare_wen),
         .windex     (ec_gshare_windex),
         .take       (ec_realj),
         // * O
         .rindex     (if_gshare_index),
         .predict    (if_gshare_take),      // * 预测方向
-        .GHR        (ghr)
+        .r_GHR      (ghr)
     );
 
     if_pd_seg u_if_pd_seg(
@@ -451,6 +480,7 @@ module cpu_core(
         .if_gshare_take (if_gshare_take),
         .if_gshare_index(if_gshare_index),
 
+        // .pd_pc_zero     (pd_pc_zero),
         .pd_bd          (pd_bd),
         .pd_addr_error  (pd_addr_error),
         .pd_pc          (pd_pc),
@@ -460,36 +490,56 @@ module cpu_core(
         .pd_btb_target  (pd_btb_target),
         .pd_btb_index   (pd_btb_index),
         .pd_gshare_take (pd_gshare_take),
-        .pd_gshare_index(pd_gshare_index)
+        .pd_gshare_index(pd_gshare_index),
+        .pd_inst_invalid(pd_inst_invalid)
     );
 
     // * PD
-    reg bp_fail_flush, pd_eret_d;
+    reg bp_fail_flush;
+    // always @(posedge aclk) begin
+    //     if(!aresetn)        bp_fail_flush <= 1'b0;
+    //     else if(!ec_exc_oc) begin
+    //         if(ec_bp_error || ex_bp_error)
+    //             bp_fail_flush <= 1'b1;
+    //         else if(id_bp_error)
+    //             bp_fail_flush <= inst_data_ok;
+    //         else
+    //             bp_fail_flush <= !inst_data_ok && bp_fail_flush && !pd_bd;
+    //     end
+    //     else
+    //         bp_fail_flush <= 1'b0;
+    // end
+    // reg pd_eret_d;
+    // always @(posedge aclk) begin
+    //     if(!aresetn)    pd_eret_d   <= 1'b0;
+    //     else            pd_eret_d   <= pd_eret || (!inst_data_ok && pd_eret_d);
+    // end
+
+    reg [31:0] inst_bank;
     always @(posedge aclk) begin
-        if(!aresetn)        bp_fail_flush <= 1'b0;
-        else if(!ec_exc_oc) begin
-            if(ec_bp_error || ex_bp_error)
-                bp_fail_flush <= 1'b1;
-            else if(id_bp_error)
-                bp_fail_flush <= !pd_bd || inst_data_ok;
-            else
-                bp_fail_flush <= !inst_data_ok && bp_fail_flush;
-        end
+        if(!aresetn || !pd_id_stall)
+            inst_bank <= 32'h0;
+        else if(!inst_bank_valid && inst_data_ok)
+            inst_bank <= inst_rdata;
         else
-            bp_fail_flush <= 1'b0;
-    end
-    always @(posedge aclk) begin
-        if(!aresetn)    pd_eret_d   <= 1'b0;
-        else            pd_eret_d   <= pd_eret || (!inst_data_ok && pd_eret_d);
+            inst_bank <= inst_bank;
+
+        // inst_bank_valid 表示有存货
+        if(!aresetn || !pd_id_stall)
+            inst_bank_valid <= 1'b0;
+        else if(!inst_bank_valid && inst_data_ok)
+            inst_bank_valid <= 1'b1;
+        else 
+            inst_bank_valid <= inst_bank_valid;
     end
 
     // *        exc_oc 后一条以及inst_data_ok低和取指地址错时, 分支等等都是无效指令
     wire [31:0] mask =  {32{
-                            inst_data_ok    && !bp_fail_flush       && 
-                            !pd_eret_d      && (!ex_j_r || pd_bd)   && 
+                            inst_data_ok    && /*!bp_fail_flush     && */
+                            /*!pd_eret_d      &&*/ !pd_inst_invalid     &&
                             !exc_oc_invalid && !pd_addr_error       }};
 
-    assign pd_inst  =   inst_rdata & mask;
+    assign pd_inst  =   inst_bank_valid ? inst_bank : inst_rdata & mask;
 
     // * 指令预解码
     pd u_pd(

@@ -14,7 +14,6 @@ module pd_id_seg (
     input [31:0]        pd_inst,
     input               pd_bd,
     input               pd_branch,
-    // input [31:0]        pd_target,
     input               pd_b,
     input               pd_j_dir,
     input               pd_j_r,
@@ -42,7 +41,6 @@ module pd_id_seg (
     output reg [31:0]           id_inst,
     output reg                  id_bd,
     output reg                  id_branch,
-    // output reg [31:0]           id_target,
     output reg                  id_b,
     output reg                  id_j_dir,
     output reg                  id_j_r,
@@ -73,7 +71,6 @@ module pd_id_seg (
             id_inst         <= 32'd0;
             id_bd           <= 1'b0;
             id_branch       <= 1'b0;
-            // id_target       <= 1'b0;
             id_b            <= 1'b0;
             id_j_dir        <= 1'b0;
             id_j_r          <= 1'b0;
@@ -99,7 +96,6 @@ module pd_id_seg (
             id_inst         <= pd_inst;
             id_bd           <= pd_bd;
             id_branch       <= pd_branch;
-            // id_target       <= pd_target;
             id_b            <= pd_b;
             id_j_dir        <= pd_j_dir;
             id_j_r          <= pd_j_r;

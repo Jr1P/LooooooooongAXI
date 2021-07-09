@@ -109,10 +109,25 @@
 `define NUM_EX_1    5
 `define EXBITS      `NUM_EX_1:0
 
-// * Index (4, 0)
-`define Index_LenIndex 8
-`define Index_IndexBITs `Index_LenIndex-1:0
-`define TLB_SIZE 6'd63
+// * Index (0, 0) use to index TLB
+`define IndexLen 3'd5
+`define TLB_SIZE 6'd32
+
+// * EntryLo    0,1: (2, 0), (3,0)
+`define EntryLo_PFN     25:6
+`define EntryLo_Flags   5 :0
+// * Flags contain :
+// * C  [5:3]   : cache, 3'b011 means cached, 3'b010 means not cached, other value reserved
+// * D  [2]     : Dirty   1'b1 means writeable, 1'b0 means not writeable
+// * V  [1]     : valid
+// * G  [0]     : global
+
+// * PageMask (5, 0)
+`define PageMask_Mask 24:13
+
+// * EntryHi (10, 0)
+`define EntryHi_VPN2 31:13
+`define EntryHi_ASID 7 : 0
 
 // * Status (12, 0)
 `define Status_Bev  22

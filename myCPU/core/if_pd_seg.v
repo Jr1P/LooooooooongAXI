@@ -18,6 +18,7 @@ module if_pd_seg(
     input               if_gshare_take,
     input [`GHR_BITS]   if_gshare_index,
     
+    // output reg              pd_pc_zero,
     output reg              pd_bd,  // * branch delay slot
     output reg              pd_addr_error,
     output reg  [31:0]      pd_pc,
@@ -27,14 +28,12 @@ module if_pd_seg(
     output reg  [31:0]      pd_btb_target,
     output reg  [`BTB_BITS] pd_btb_index,
     output reg              pd_gshare_take,
-    output reg  [`GHR_BITS] pd_gshare_index
+    output reg  [`GHR_BITS] pd_gshare_index,
+    output reg              pd_inst_invalid
 );
 
 always @(posedge clk) begin
-    if(!resetn)
-        pd_inst_req     <= 1'b0;
-    else if(!stall)
-        pd_inst_req     <= if_inst_req;
+    pd_inst_invalid <= (!resetn || refresh) || (stall && pd_inst_invalid);
 end
 
 always @(posedge clk) begin
@@ -42,6 +41,7 @@ always @(posedge clk) begin
         pd_bd           <= 1'b0;
         pd_addr_error   <= 1'b0;
         pd_pc           <= 32'b0;
+        pd_inst_req     <= 1'b0;
         pd_btb_hit      <= 1'b0;
         pd_btb_target   <= 32'h0;
         pd_btb_index    <= `BTB_LEN'h0;
@@ -53,6 +53,7 @@ always @(posedge clk) begin
         pd_addr_error   <= if_addr_error;
         pd_pc           <= if_pc;
         pd_pc_8         <= if_pc+32'd8;
+        pd_inst_req     <= if_inst_req;
         pd_btb_hit      <= if_btb_hit;
         pd_btb_target   <= if_btb_target;
         pd_btb_index    <= if_btb_index;
