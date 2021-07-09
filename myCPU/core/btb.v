@@ -27,7 +27,9 @@ module btb(
 
     wire index_rw_eq = index_w == index_r;
     assign index_r = pc_r[9:2] ^ ghr; // TODO maybe another way
-    // *                       正好读写入的  以及其他
+    // // *                       正好读写入的  以及其他
+    // assign hit_r = wen && index_rw_eq ? pc_r == pc_w : valid[index_r] && pc_r == tag[index_r];
+
     assign {hit_r, target_r} =  /*remove && index_rw_eq   ?   33'b0                                                   : */
                                 wen && index_rw_eq      ?   {pc_r == pc_w, target_w}                           :
                                                             {valid[index_r] && pc_r == tag[index_r], dest[index_r]} ;

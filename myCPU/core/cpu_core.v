@@ -51,8 +51,9 @@ module cpu_core(
     wire [`GHR_BITS]if_gshare_index;
     wire            if_gshare_take;
     // * PD
+    wire            pd_fail_flushed; // * 表示if_pd段是否被ex或ec段的bp_fail刷新过
+    wire            pd_empty;
     wire            pd_addr_error;
-    // wire            pd_pc_zero;
     wire [31:0]     pd_pc;
     wire [31:0]     pd_pc_8;
     wire [31:0]     pd_inst;
@@ -90,6 +91,7 @@ module cpu_core(
     wire            pd_gshare_take;
     wire [`GHR_BITS]pd_gshare_index;
     // *ID
+    wire            id_fail_flushed; // * 表示pd_id段是否被ec段的bp_fail刷新过
     wire            id_b;
     wire            id_j_dir;
     wire            id_j_r;
@@ -313,18 +315,14 @@ module cpu_core(
                                 inst_data_ok    ? IDLE :
                                 inst_cache_state       ;
 
-    // reg last_branch_stall;
-    // always @(posedge aclk) begin
-    //     if(!aresetn)    last_branch_stall   <= 1'b0;
-    //     else            last_branch_stall   <= branch_stall || (!if_pd_stall && pd_j_r);
-    // end
-
     assign inst_req =   !id_bp_error && !ex_bp_error && !ec_bp_error &&
                         !ec_exc_oc && (!inst_cache_state || inst_data_ok) && 
                         !pd_eret && !if_addr_error && !id_j_r;
     
     cu u_cu(
-        // .pd_pc_zero     (pd_pc_zero),
+        .pd_empty       (pd_empty),
+        .if_addr_error  (if_addr_error),
+        .pd_addr_error  (pd_addr_error),
         .pd_bd          (pd_bd),
         .id_bd          (id_bd),
         .ex_bd          (ex_bd),
@@ -383,7 +381,7 @@ module cpu_core(
     // * 分支预测
     assign bp_take = pd_dir || pd_bp_ok || id_j_r;
    
-    assign bp_target =  id_j_r ? re_rs :
+    assign bp_target =  id_j_r ? re_rs :// pd_target;
                         pd_dir ? pd_target : pd_btb_target;
     assign bp_fail = ((id_bp_error || ex_bp_error) && !ec_exc_oc) || ec_bp_error;
     assign bp_real_target = ec_bp_error ? 
@@ -400,8 +398,10 @@ module cpu_core(
         .clk            (aclk),
         .resetn         (aresetn),
 
-        // .inst_addr_ok   (inst_addr_ok),
         .pd_id_stall    (pd_id_stall),
+        .id_j_r         (id_j_r),
+        .pd_bd          (pd_bd),
+        .inst_addr_ok   (inst_addr_ok),
         .inst_bank_valid(inst_bank_valid),
         .stall          (pc_stall),
         .branch_stall   (branch_stall),
@@ -470,6 +470,7 @@ module cpu_core(
         .stall  (if_pd_stall),
         .refresh(if_pd_refresh),
 
+        .id_j_r         (id_j_r),
         .pd_branch      (pd_branch),
         .if_addr_error  (if_addr_error),
         .if_pc          (inst_addr),
@@ -480,7 +481,7 @@ module cpu_core(
         .if_gshare_take (if_gshare_take),
         .if_gshare_index(if_gshare_index),
 
-        // .pd_pc_zero     (pd_pc_zero),
+        .empty          (pd_empty),
         .pd_bd          (pd_bd),
         .pd_addr_error  (pd_addr_error),
         .pd_pc          (pd_pc),
@@ -495,26 +496,6 @@ module cpu_core(
     );
 
     // * PD
-    reg bp_fail_flush;
-    // always @(posedge aclk) begin
-    //     if(!aresetn)        bp_fail_flush <= 1'b0;
-    //     else if(!ec_exc_oc) begin
-    //         if(ec_bp_error || ex_bp_error)
-    //             bp_fail_flush <= 1'b1;
-    //         else if(id_bp_error)
-    //             bp_fail_flush <= inst_data_ok;
-    //         else
-    //             bp_fail_flush <= !inst_data_ok && bp_fail_flush && !pd_bd;
-    //     end
-    //     else
-    //         bp_fail_flush <= 1'b0;
-    // end
-    // reg pd_eret_d;
-    // always @(posedge aclk) begin
-    //     if(!aresetn)    pd_eret_d   <= 1'b0;
-    //     else            pd_eret_d   <= pd_eret || (!inst_data_ok && pd_eret_d);
-    // end
-
     reg [31:0] inst_bank;
     always @(posedge aclk) begin
         if(!aresetn || !pd_id_stall)

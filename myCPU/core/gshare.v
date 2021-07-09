@@ -4,6 +4,7 @@
 ! 在写之前如果又读同样位置，可能出错，这个发生的概率较小
 ! 而且写之前GHR没有更新，会导致之后很接近的分支语句的index定位到错误的index，这个如果branch跳转到branch就可能发生
 **/
+`define PRE_WRITE_ENABLE
 module gshare(
     input               clk,
     input               resetn,
@@ -31,7 +32,7 @@ module gshare(
     reg [`GHR_BITS] GHR;
     reg [1:0]       PHT[`PHT_BITS];
     // reg useless;
-    assign rindex = GHR ^ pc_predict;
+    assign rindex = r_GHR ^ pc_predict;
 
     integer i;
     always @(posedge clk) begin
@@ -41,6 +42,16 @@ module gshare(
             end
             GHR <= `GHR_LEN'd0;
         end
+        
+    `ifndef PRE_WRITE_ENABLE
+        else if(wen) begin
+            if(take && PHT[windex] != Strongly_Take) 
+                PHT[windex]  <= PHT[windex]+2'd1;
+            else if(!take && PHT[windex] != Strongly_Not_Take)
+                PHT[windex]  <= PHT[windex]-2'd1;
+            GHR <= {GHR[7:1],take};
+        end
+    `else
         else if(wen) begin
             if(take && PHT[windex] != Strongly_Take) 
                 PHT[windex]  <= PHT[windex]+2'd1;
@@ -57,12 +68,18 @@ module gshare(
         else if(pre_wen) begin
             GHR <= {GHR[6:0], pre_take};
         end
+    `endif
     end
 
     assign predict  = PHT[rindex][1];
+
+`ifndef PRE_WRITE_ENABLE
+    assign r_GHR = wen ? GHR : {GHR[7:1], take};
+`else
     assign r_GHR    =   wen ? 
                             !pre_wen ? {GHR[7:1], take} : {GHR[6:1],take, pre_take} :
                         pre_wen ? {GHR[6:0], pre_take} :
                         GHR;
+`endif
 
 endmodule

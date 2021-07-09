@@ -7,6 +7,7 @@ module pd_id_seg (
 
     input           stall,
     input           refresh,
+    input           ec_bp_fail,
 
     input               pd_addr_error,
     input [31:0]        pd_pc,
@@ -60,8 +61,13 @@ module pd_id_seg (
     output reg                  id_op_beq,
     output reg                  id_op_bne,
     output reg                  id_op_blez,
-    output reg                  id_op_bgtz
+    output reg                  id_op_bgtz,
+    output reg                  id_fail_flushed
 );
+
+    always @(posedge clk) begin
+        id_fail_flushed <= ec_bp_fail;
+    end
 
     always @(posedge clk) begin
         if(!resetn || refresh) begin

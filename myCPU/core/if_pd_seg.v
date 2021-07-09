@@ -7,7 +7,9 @@ module if_pd_seg(
 
     input   stall,      // *暂停
     input   refresh,    // *刷新
+    input   ex_af_bp_fail,  // * ex段及以后的预测失败
 
+    input               id_j_r,
     input               pd_branch,  // 前一条指令是否为分支
     input               if_addr_error,
     input [31:0]        if_pc,
@@ -19,6 +21,7 @@ module if_pd_seg(
     input [`GHR_BITS]   if_gshare_index,
     
     // output reg              pd_pc_zero,
+    output reg              empty,
     output reg              pd_bd,  // * branch delay slot
     output reg              pd_addr_error,
     output reg  [31:0]      pd_pc,
@@ -29,7 +32,8 @@ module if_pd_seg(
     output reg  [`BTB_BITS] pd_btb_index,
     output reg              pd_gshare_take,
     output reg  [`GHR_BITS] pd_gshare_index,
-    output reg              pd_inst_invalid
+    output reg              pd_inst_invalid,
+    output reg              pd_fail_flushed
 );
 
 always @(posedge clk) begin
@@ -37,7 +41,12 @@ always @(posedge clk) begin
 end
 
 always @(posedge clk) begin
+    pd_fail_flushed <= ex_af_bp_fail; // * 因为失败时的刷新只会在
+end
+
+always @(posedge clk) begin
     if(!resetn || refresh) begin
+        empty           <= 1'b0;
         pd_bd           <= 1'b0;
         pd_addr_error   <= 1'b0;
         pd_pc           <= 32'b0;
@@ -49,6 +58,7 @@ always @(posedge clk) begin
         pd_gshare_index <= `GHR_LEN'h0;
     end
     else if(!stall) begin
+        empty           <= id_j_r;
         pd_bd           <= pd_branch;
         pd_addr_error   <= if_addr_error;
         pd_pc           <= if_pc;
