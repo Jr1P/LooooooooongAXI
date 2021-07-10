@@ -3,7 +3,11 @@
 
 // * five segment pipeline cpu
 
-// TODO: 1. on board test 2.时序 3. TLB inst  mul inst  4. interrupt mech    5. maybe 反思
+// TODO: 1. 时序优化以及分支预测优化
+// *TODO    1.1 RAS添加
+// *TODO    1.2 gshare预写优化
+// *TODO    1.3 refresh逻辑简化
+// TODO: 2. TLB inst  mul inst  3. interrupt mech    4. maybe 反思
 module cpu_core(
     input   [5 :0]  ext_int,        // *硬件中断
 
@@ -92,6 +96,7 @@ module cpu_core(
     wire [`GHR_BITS]pd_gshare_index;
     // *ID
     wire            id_fail_flushed; // * 表示pd_id段是否被ec段的bp_fail刷新过
+    wire            id_empty;
     wire            id_b;
     wire            id_j_dir;
     wire            id_j_r;
@@ -155,6 +160,7 @@ module cpu_core(
     wire            id_gshare_pre_wen;
     wire            id_pre_bit;
     // *EX
+    wire            ex_empty;
     wire [`EXBITS]  ex_ex;
     wire [31:0]     ex_pc;
     wire [31:0]     ex_pc_8;
@@ -321,6 +327,9 @@ module cpu_core(
     
     cu u_cu(
         .pd_empty       (pd_empty),
+        .id_empty       (id_empty),
+        .ex_empty       (ex_empty),
+
         .if_addr_error  (if_addr_error),
         .pd_addr_error  (pd_addr_error),
         .pd_bd          (pd_bd),
@@ -381,9 +390,10 @@ module cpu_core(
     // * 分支预测
     assign bp_take = pd_dir || pd_bp_ok || id_j_r;
    
-    assign bp_target =  id_j_r ? re_rs :// pd_target;
-                        pd_dir ? pd_target : pd_btb_target;
-    assign bp_fail = ((id_bp_error || ex_bp_error) && !ec_exc_oc) || ec_bp_error;
+    // ! 这里将BTB读出的目标直接不要了，如果需要，请用下面的
+    assign bp_target =  id_j_r ? re_rs : pd_target;
+                        // pd_dir ? pd_target : pd_btb_target;
+    assign bp_fail = id_bp_error || ex_bp_error || ec_bp_error;
     assign bp_real_target = ec_bp_error ? 
                                 ec_bp_take ? ec_pc_8 : ec_btb_wtarget
                           : ex_bp_error ?
@@ -436,14 +446,14 @@ module cpu_core(
         // * write
         .wen        (ec_btb_wen),
         .index_w    (ec_btb_windex),
-        .pc_w       (ec_pc),
-        .target_w   (ec_btb_wtarget),
+        .pc_w       (ec_pc[31:2]),
+        // .target_w   (ec_btb_wtarget),
         // * read
-        .pc_r       (npc), // * I
+        .pc_r       (npc[31:2]), // * I
         .ghr        (ghr),  // * I
         .hit_r      (if_btb_hit), // * O
-        .index_r    (if_btb_index), // * O
-        .target_r   (if_btb_target)  // * O
+        .index_r    (if_btb_index) // * O
+        // .target_r   (if_btb_target)  // * O
     );
 
     gshare u_gshare(
@@ -470,7 +480,7 @@ module cpu_core(
         .stall  (if_pd_stall),
         .refresh(if_pd_refresh),
 
-        .id_j_r         (id_j_r),
+        // .id_j_r         (id_j_r),
         .pd_branch      (pd_branch),
         .if_addr_error  (if_addr_error),
         .if_pc          (inst_addr),
@@ -481,7 +491,7 @@ module cpu_core(
         .if_gshare_take (if_gshare_take),
         .if_gshare_index(if_gshare_index),
 
-        .empty          (pd_empty),
+        .pd_empty       (pd_empty),
         .pd_bd          (pd_bd),
         .pd_addr_error  (pd_addr_error),
         .pd_pc          (pd_pc),
@@ -550,7 +560,7 @@ module cpu_core(
     );
 
     assign pd_dir    = pd_take && pd_target_ok;          // * 确定直接跳转
-    assign pd_bp_ok  = pd_btb_hit && pd_gshare_take;     // * 预测跳转
+    assign pd_bp_ok  = (pd_btb_hit || pd_gshare_wen) && pd_gshare_take;     // * 预测跳转
 
     // ! 注意pd_take = 0表示暂不确定方向的跳转
     assign pd_btb_wen = !pd_take && pd_b && !pd_btb_hit; // * 对于未命中的条件跳转且不是beq 0 0 才会写btb
@@ -564,6 +574,7 @@ module cpu_core(
         .refresh    (pd_id_refresh),
         
         .pd_addr_error  (pd_addr_error),
+        .pd_empty       (pd_empty),
         .pd_pc          (pd_pc),
         .pd_pc_8        (pd_pc_8),
         .pd_inst        (pd_inst),
@@ -581,7 +592,7 @@ module cpu_core(
         // * gshare
         .pd_gshare_wen      (pd_gshare_wen),
         .pd_gshare_windex   (pd_gshare_index),
-        .pd_bp_take         (pd_btb_hit && pd_gshare_take),
+        .pd_bp_take         (pd_bp_ok),
         // * 预解码信息
         .pd_op_bltz     (pd_op_bltz || pd_op_bltzal),
         .pd_op_bgez     (pd_op_bgez || pd_op_bgezal),
@@ -591,6 +602,7 @@ module cpu_core(
         .pd_op_bgtz     (pd_op_bgtz     ),
 
         .id_addr_error  (id_addr_error),
+        .id_empty       (id_empty),
         .id_pc          (id_pc),
         .id_pc_8        (id_pc_8),
         .id_inst        (id_inst),
@@ -711,6 +723,7 @@ module cpu_core(
         .wb_wreg            (wb_wreg),
         .wb_reorder_data    (wb_reorder_data),
 
+        .id_empty   (id_empty),
         .id_ex      (id_ex),
         .id_pc      (id_pc),
         .id_pc_8    (id_pc_8),
@@ -762,6 +775,7 @@ module cpu_core(
         .id_op_bgtz     (id_op_bgtz),
         .id_wait_seg    (id_wait_seg),
 
+        .ex_empty   (ex_empty),
         .ex_ex      (ex_ex),
         .ex_pc      (ex_pc),
         .ex_pc_8    (ex_pc_8),

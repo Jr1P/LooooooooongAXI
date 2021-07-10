@@ -14,6 +14,7 @@ module id_ex_seg (
 
     input [`EXBITS] id_ex,
 
+    input           id_empty,
     input [31:0]    id_pc,
     input [31:0]    id_pc_8,
     input [31:0]    id_inst,
@@ -64,6 +65,7 @@ module id_ex_seg (
     input           id_op_bgtz,
     input [1:0]     id_wait_seg,
 
+    output reg              ex_empty,
     output reg [`EXBITS]    ex_ex,
     output reg [31:0]       ex_pc,
     output reg [31:0]       ex_pc_8,
@@ -119,6 +121,7 @@ module id_ex_seg (
     always @(posedge clk) begin
         if(!resetn || refresh) begin
             ex_ex           <= `NUM_EX'b0;
+            ex_empty        <= 1'b0;
             ex_pc           <= 32'h0;
             ex_pc_8         <= 32'h0;
             ex_inst         <= 32'h0;
@@ -171,6 +174,7 @@ module id_ex_seg (
         end
         else if(!stall) begin
             ex_ex           <= id_ex;
+            ex_empty        <= id_empty;
             ex_pc           <= id_pc;
             ex_pc_8         <= id_pc_8;
             ex_inst         <= id_inst;

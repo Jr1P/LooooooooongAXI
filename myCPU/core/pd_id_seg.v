@@ -9,6 +9,7 @@ module pd_id_seg (
     input           refresh,
     input           ec_bp_fail,
 
+    input               pd_empty,
     input               pd_addr_error,
     input [31:0]        pd_pc,
     input [31:0]        pd_pc_8,
@@ -37,6 +38,7 @@ module pd_id_seg (
     input               pd_op_bgtz,
     // * O
     output reg                  id_addr_error,
+    output reg                  id_empty,
     output reg [31:0]           id_pc,
     output reg [31:0]           id_pc_8,
     output reg [31:0]           id_inst,
@@ -72,6 +74,7 @@ module pd_id_seg (
     always @(posedge clk) begin
         if(!resetn || refresh) begin
             id_addr_error   <= 1'b0;
+            id_empty        <= 1'b1;
             id_pc           <= 32'd0;
             id_pc_8         <= 32'd0;
             id_inst         <= 32'd0;
@@ -97,6 +100,7 @@ module pd_id_seg (
         end
         else if(!stall) begin
             id_addr_error   <= pd_addr_error;
+            id_empty        <= pd_empty;
             id_pc           <= pd_pc;
             id_pc_8         <= pd_pc_8;
             id_inst         <= pd_inst;
